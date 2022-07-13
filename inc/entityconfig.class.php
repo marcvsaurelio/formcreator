@@ -69,6 +69,8 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
    const CONFIG_UI_FORM_MASONRY = 0;
    const CONFIG_UI_FORM_UNIFORM_HEIGHT = 1;
 
+   const CONFIG_FORM_TRANSITION_PAGE = 0;
+   const CONFIG_FORM_TRANSITION_MODAL = 1;
 
    /**
     * @var bool $dohistory maintain history
@@ -158,6 +160,14 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
       ];
    }
 
+   public static function getEnumFormTransition(): array {
+      return [
+         self::CONFIG_PARENT                => __('Inheritance of the parent entity'),
+         self::CONFIG_FORM_TRANSITION_PAGE  => __('Full page', 'formcreator'),
+         self::CONFIG_FORM_TRANSITION_MODAL => __('Modal', 'formcreator'),
+      ];
+   }
+
    public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0) {
       if ($item->getType() == 'Entity') {
          $config = new self();
@@ -208,6 +218,7 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
          'is_search_visible'      => self::CONFIG_PARENT,
          'is_dashboard_visible'   => self::CONFIG_PARENT,
          'is_header_visible'      => self::CONFIG_PARENT,
+         'form_transition'        => self::CONFIG_PARENT,
       ]);
 
       return $entityConfig;
@@ -382,6 +393,22 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
       ]);
       echo '</td></tr>';
 
+      // Form transition
+      $elements = self::getEnumFormTransition();
+      if ($entityId == 0) {
+         unset($elements[self::CONFIG_PARENT]);
+      }
+      echo "<tr class='tab_bg_1'>";
+      echo "<td>".__('Form transition', 'formcreator')."</td>";
+      echo "<td>";
+      Dropdown::showFromArray('form_transition', $elements, ['value' => $this->fields['form_transition']]);
+      if ($this->fields['form_transition'] == self::CONFIG_PARENT) {
+         $tid = self::getUsedConfig('form_transition', $entityId);
+         echo '<br>';
+         Entity::inheritedValue($elements[$tid], true);
+      }
+      echo '</td></tr>';
+
       if ($canedit) {
          echo "<tr>";
          echo "<td class='tab_bg_2 center' colspan='4'>";
@@ -457,6 +484,66 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
          'massiveaction'   => true,
       ];
 
+      $tab[] = [
+         'id'              => '9',
+         'table'           => self::getTable(),
+         'name'            => __('Default Form list mode', 'formcreator'),
+         'field'           => 'default_form_list_mode',
+         'datatype'        => 'integer',
+         'nosearch'        => true,
+         'massiveaction'   => true,
+      ];
+
+      $tab[] = [
+         'id'              => '10',
+         'table'           => self::getTable(),
+         'name'            => __('Search', 'formcreator'),
+         'field'           => 'is_search_visible',
+         'datatype'        => 'integer',
+         'nosearch'        => true,
+         'massiveaction'   => true,
+      ];
+
+      $tab[] = [
+         'id'              => '11',
+         'table'           => self::getTable(),
+         'name'            => __('Counters dashboard', 'formcreator'),
+         'field'           => 'is_dashboard_visible',
+         'datatype'        => 'integer',
+         'nosearch'        => true,
+         'massiveaction'   => true,
+      ];
+
+      $tab[] = [
+         'id'              => '12',
+         'table'           => self::getTable(),
+         'name'            => __('Search issue', 'formcreator'),
+         'field'           => 'is_search_issue_visible',
+         'datatype'        => 'integer',
+         'nosearch'        => true,
+         'massiveaction'   => true,
+      ];
+
+      $tab[] = [
+         'id'              => '13',
+         'table'           => self::getTable(),
+         'name'            => __('Tile design', 'formcreator'),
+         'field'           => 'tile_design',
+         'datatype'        => 'integer',
+         'nosearch'        => false,
+         'massiveaction'   => true,
+      ];
+
+      $tab[] = [
+         'id'              => '14',
+         'table'           => self::getTable(),
+         'name'            => __('Form transition', 'formcreator'),
+         'field'           => 'form_transition',
+         'datatype'        => 'integer',
+         'nosearch'        => false,
+         'massiveaction'   => true,
+      ];
+
       return $tab;
    }
 
@@ -491,7 +578,6 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
             if (!is_numeric($default_value)) {
                return $entityConfig->fields[$fieldval];
             }
-
          }
       }
 
@@ -502,7 +588,6 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
             $ret = self::getUsedConfig($fieldref, $entity->fields['entities_id'], $fieldval,
                   $default_value);
             return $ret;
-
          }
       }
 
