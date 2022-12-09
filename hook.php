@@ -742,3 +742,14 @@ function plugin_formcreator_hook_update_user(CommonDBTM $item) {
       }
    }
 }
+
+function plugin_formcreator_hook_tag_blacklisted_types($list) {
+   return array_merge([
+      PluginFormcreatorFormanswer::class,
+      PluginFormcreatorSection::class,
+      PluginFormcreatorQuestion::class,
+      PluginFormcreatorTargetTicket::class,
+      PluginFormcreatorTargetChange::class,
+      PluginFormcreatorTargetProblem::class,
+   ], $list);
+}
