@@ -80,28 +80,14 @@ class PluginFormcreatorInstall {
       '2.13'   => '2.13.1',
       '2.13.1' => '2.13.3',
       '2.13.3' => '2.13.4',
-      '2.13.4' => '2.13.5',
+      '2.13.4' => '2.13.4.1',
+      '2.13.4.1' => '2.13.5',
       '2.13.5' => '2.13.6',
       '2.13.6' => '2.13.7',
-      '2.13.6' => '2.14',
+      '2.13.7' => '2.13.9.1',
    ];
 
    protected bool $resyncIssues = false;
-
-   /**
-    * All upgradable versions
-    *
-    * used for unit tests
-    *
-    * @return array
-    */
-   public function getUpgradableVersions(): array {
-      $versions = $this->upgradeSteps;
-      unset($versions['0.0']);
-      $versions = array_keys($versions);
-
-      return $versions;
-   }
 
    /**
     * Install the plugin
@@ -119,7 +105,6 @@ class PluginFormcreatorInstall {
       $this->createCronTasks();
       $this->createNotifications();
       $this->createMiniDashboard();
-      $this->addRightsToAdministrateForms();
       Config::setConfigurationValues('formcreator', ['schema_version' => PLUGIN_FORMCREATOR_SCHEMA_VERSION]);
 
       $task = new CronTask();
@@ -129,47 +114,36 @@ class PluginFormcreatorInstall {
    }
 
    /**
-    * Check if tables shall be converted to innodb
-    *
-    * @return boolean false if tables must be converted
-    */
-   public function checkMyIsamTables(): bool {
-      global $DB;
-
-      if (version_compare(GLPI_VERSION, '9.5') < 0) {
-         return true;
-      }
-
-      $iterator = $DB->getMyIsamTables();
-      $hasMyisamTables = false;
-      foreach ($iterator as $table) {
-         if (strpos($table['TABLE_NAME'], 'glpi_plugin_formcreator_') === 0) {
-            $hasMyisamTables = true;
-            break;
-         }
-      }
-
-      return !$hasMyisamTables;
-   }
-
-   /**
     * Upgrade the plugin
     * @param Migration $migration
     * @param array $args arguments passed to CLI
     * @return bool
     */
    public function upgrade(Migration $migration, $args = []): bool {
-      if (!$this->checkMyIsamTables()) {
-         $message = sprintf(
-            __('Upgrade tables to innoDB; run %s', 'formcreator'),
-            'php bin/console glpi:migration:myisam_to_innodb'
-         );
-         if (isCommandLine()) {
-            echo $message . PHP_EOL;
-         } else {
-            Session::addMessageAfterRedirect($message, false, ERROR);
+      global $DB;
+
+      if (version_compare(GLPI_VERSION, '9.5') >= 0) {
+         $iterator = $DB->getMyIsamTables();
+         $hasMyisamTables = false;
+         foreach ($iterator as $table) {
+            if (strpos($table['TABLE_NAME'], 'glpi_plugin_formcreator_') === 0) {
+               $hasMyisamTables = true;
+               break;
+            }
          }
-         return false;
+         if ($hasMyisamTables) {
+            // Need to convert myisam tables into innodb first
+            $message = sprintf(
+               __('Upgrade tables to innoDB; run %s', 'formcreator'),
+               'php bin/console glpi:migration:myisam_to_innodb'
+            );
+            if (isCommandLine()) {
+               echo $message . PHP_EOL;
+            } else {
+               Session::addMessageAfterRedirect($message, false, ERROR);
+            }
+            return false;
+         }
       }
 
       $this->migration = $migration;
@@ -239,26 +213,9 @@ class PluginFormcreatorInstall {
       $this->resyncIssues = false;
 
       ob_start();
-      try {
-         while ($fromSchemaVersion && isset($this->upgradeSteps[$fromSchemaVersion])) {
-            $toSchemaVersion = $this->upgradeSteps[$fromSchemaVersion];
-            $this->upgradeOneStep($toSchemaVersion);
-            $fromSchemaVersion = $toSchemaVersion;
-         }
-      } catch (\Throwable $e) {
-         Session::addMessageAfterRedirect(
-            sprintf(
-               __(
-                  'A fatal error occured in the upgrade from %s! Upgrade aborted. Please check logs to fix the problem then try again.',
-                  'formcreator'
-               ),
-               $fromSchemaVersion,
-               $toSchemaVersion
-            ),
-            false,
-            ERROR
-         );
-         return false;
+      while ($fromSchemaVersion && isset($this->upgradeSteps[$fromSchemaVersion])) {
+         $this->upgradeOneStep($this->upgradeSteps[$fromSchemaVersion]);
+         $fromSchemaVersion = $this->upgradeSteps[$fromSchemaVersion];
       }
       $this->migration->executeMigration();
 
@@ -327,9 +284,7 @@ class PluginFormcreatorInstall {
 
       include_once $includeFile;
       $updateClass = "PluginFormcreatorUpgradeTo$suffix";
-      if (isCommandLine()) {
-         $this->migration->addNewMessageArea("Upgrade to $toVersion");
-      }
+      $this->migration->addNewMessageArea("Upgrade to $toVersion");
       $upgradeStep = new $updateClass();
       $upgradeStep->upgrade($this->migration);
       $this->migration->executeMigration();
@@ -406,35 +361,16 @@ class PluginFormcreatorInstall {
 
       /** Value -2 is "inheritance from parent" @see PluginFormcreatorEntityconfig::CONFIG_PARENT */
       $query = "INSERT INTO glpi_plugin_formcreator_entityconfigs
-                  (
-                     entities_id,
-                     replace_helpdesk,
-                     default_form_list_mode,
-                     sort_order,
-                     is_kb_separated,
-                     is_search_visible,
-                     is_dashboard_visible,
-                     is_header_visible,
-                     is_search_issue_visible,
-                     tile_design,
-                     home_page,
-                     is_category_visible,
-                     is_folded_menu,
-                     service_catalog_home
-                  )
+                  (entities_id, replace_helpdesk, default_form_list_mode, sort_order, is_kb_separated, is_search_visible, is_dashboard_visible, is_header_visible, is_search_issue_visible, tile_design)
                SELECT ent.id,
-               IF(ent.id = 0, 0, -2),
                   IF(ent.id = 0, 0, -2),
                   IF(ent.id = 0, 0, -2),
                   IF(ent.id = 0, 0, -2),
-                  IF(ent.id = 0, 0, -2),
-                  IF(ent.id = 0, 1, -2),
-                  IF(ent.id = 0, 0, -2),
-                  IF(ent.id = 0, 1, -2),
                   IF(ent.id = 0, 0, -2),
                   IF(ent.id = 0, 0, -2),
                   IF(ent.id = 0, 1, -2),
                   IF(ent.id = 0, 0, -2),
+                  IF(ent.id = 0, 1, -2),
                   IF(ent.id = 0, 0, -2)
                 FROM glpi_entities ent
                 LEFT JOIN glpi_plugin_formcreator_entityconfigs conf
@@ -464,7 +400,7 @@ class PluginFormcreatorInstall {
       $this->migration->updateDisplayPrefs([
          'PluginFormcreatorFormAnswer' => [2, 3, 4, 5, 6],
          'PluginFormcreatorForm'       => [30, 3, 10, 7, 8, 9],
-         'PluginFormcreatorIssue'      => [1, 2, 4, 5, 6, 7, 8],
+         'PluginFormcreatorIssue'      => [1, 254, 2, 4, 5, 6, 7, 8],
       ]);
    }
 
@@ -482,9 +418,9 @@ class PluginFormcreatorInstall {
             'notified' => PluginFormcreatorNotificationTargetFormAnswer::AUTHOR,
          ],
          'plugin_formcreator_need_validation' => [
-            'name'     => __('A form need validation', 'formcreator'),
-            'subject'  => __('A form from GLPI need to be validated', 'formcreator'),
-            'content'  => __('Hi,\nA form from GLPI need to be validated and you have been choosen as the validator.\nYou can access it by clicking onto this link:\n##formcreator.validation_link##', 'formcreator'),
+            'name'     => __('A form need to be validate', 'formcreator'),
+            'subject'  => __('A form from GLPI need to be validate', 'formcreator'),
+            'content'  => __('Hi,\nA form from GLPI need to be validate and you have been choosen as the validator.\nYou can access it by clicking onto this link:\n##formcreator.validation_link##', 'formcreator'),
             'notified' => PluginFormcreatorNotificationTargetFormAnswer::APPROVER,
          ],
          'plugin_formcreator_refused'         => [
@@ -676,11 +612,9 @@ class PluginFormcreatorInstall {
          'PluginFormcreatorItem_TargetTicket',
          'PluginFormcreatorIssue',
          'PluginFormcreatorQuestionDependency',
-         'PluginFormcreatorQuestionFilter',
          'PluginFormcreatorQuestionRange',
          'PluginFormcreatorQuestionRegex',
          'PluginFormcreatorForm_Language',
-         'PluginFormcreatorFormanswerValidation',
       ];
 
       foreach ($itemtypes as $itemtype) {
@@ -830,10 +764,10 @@ class PluginFormcreatorInstall {
       ];
 
       // With counters
-      $x = 2;
-      $w = 3; // Width
+      $x = 0;
+      $w = 4; // Width
       $h = 1; // Height
-      $s = 1; // space between widgets
+      $s = 0; // space between widgets
       $y = 0;
       foreach ($cards as $key => $options) {
          $item = new Dashboard_Item();
@@ -864,31 +798,6 @@ class PluginFormcreatorInstall {
             'dashboards_dashboards_id' => $dashboardId,
             'itemtype'                 => Profile::getType(),
             'items_id'                => $helpdeskProfile['id'],
-         ]);
-      }
-   }
-
-   protected function addRightsToAdministrateForms() {
-      global $DB;
-
-      $profiles = $DB->request([
-         'SELECT' => ['id'],
-         'FROM'   => Profile::getTable(),
-      ]);
-      foreach ($profiles as $profile) {
-         $rights = ProfileRight::getProfileRights(
-            $profile['id'],
-            [
-               Entity::$rightname,
-               PluginFormcreatorForm::$rightname,
-            ]
-         );
-         if (($rights[Entity::$rightname] & (UPDATE + CREATE + DELETE + PURGE)) == 0) {
-            continue;
-         }
-         $right = READ + UPDATE + CREATE + DELETE + PURGE;
-         ProfileRight::updateProfileRights($profile['id'], [
-            PluginFormcreatorForm::$rightname => $right,
          ]);
       }
    }

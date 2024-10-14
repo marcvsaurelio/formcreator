@@ -56,7 +56,6 @@ class PluginFormcreatorUpgradeTo2_13_4 {
    }
 
    public function updateConditions() {
-      $table = 'glpi_plugin_formcreator_conditions';
-      $this->migration->changeField($table, 'show_value', 'show_value', 'mediumtext');
+      $this->migration->changeField('glpi_plugin_formcreator_conditions', 'show_value', 'show_value', 'mediumtext');
    }
 }
