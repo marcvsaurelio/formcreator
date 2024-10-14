@@ -52,7 +52,7 @@ if (Session::getCurrentInterface() == "helpdesk") {
 
 PluginFormcreatorCommon::showMiniDashboard();
 
-$form = new PluginFormcreatorForm();
+$form = PluginFormcreatorCommon::getForm();
 $form->showServiceCatalog();
 
 if (Session::getCurrentInterface() == "helpdesk") {

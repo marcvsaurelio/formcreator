@@ -47,7 +47,7 @@ if (isset($_REQUEST['id'])
       'is_active' => '1',
       'is_deleted'=> '0',
    ];
-   $form = new PluginFormcreatorForm();
+   $form = PluginFormcreatorCommon::getForm();
    if (!$form->getFromDBByCrit($criteria)) {
       Html::displayNotFoundError();
    }
@@ -71,7 +71,7 @@ if (isset($_REQUEST['id'])
          $_SESSION['valid_id'] = session_id();
          $_SESSION['glpiactiveentities'] = [$form->fields['entities_id']];
          $subentities = getSonsOf('glpi_entities', $form->fields['entities_id']);
-         $_SESSION['glpiactiveentities_string'] = (!empty($subentities) && ($form->fields['is_recursive'] != '0'))
+         $_SESSION['glpiactiveentities_string'] = (!empty($subentities))
                                                 ? "'" . implode("', '", $subentities) . "'"
                                                 : "'" . $form->fields['entities_id'] . "'";
          $_SESSION['glpilanguage'] = $form->getBestLanguage();

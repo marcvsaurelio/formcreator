@@ -29,7 +29,7 @@
  * ---------------------------------------------------------------------
  */
 
-include ("../../../inc/includes.php");
+include ('../../../inc/includes.php');
 
 Session::checkRight('entity', UPDATE);
 
@@ -38,7 +38,45 @@ if (!(new Plugin())->isActivated('formcreator')) {
    Html::displayNotFoundError();
 }
 
+// Get target form
+$form_id = $_POST[PluginFormcreatorForm::getForeignKeyField()] ?? null;
+if (is_null($form_id)) {
+   http_response_code(400);
+   die;
+}
 
-// Return to form list
-Html::redirect(FORMCREATOR_ROOTDOC . '/front/form.php');
+// No update if `access_rights` is not modified, keeping the save behavior as
+// the previous form_profile.form.php file
+if (!isset($_POST['access_rights'])) {
+   Html::back();
+   die;
+}
 
+// Try to load form
+$form = PluginFormcreatorForm::getById($form_id);
+if (!$form) {
+   Html::displayNotFoundError();
+}
+
+// Prepare input
+$input = [
+   'id'                 => (int) $form_id,
+   'is_captcha_enabled' => $_POST['is_captcha_enabled'] ?? false,
+   'access_rights'      => (int) $_POST['access_rights'],
+   'users'              => [],
+   'groups'             => [],
+   'profiles'           => [],
+   'entities'           => [],
+];
+
+$restrictions = $_POST['restrictions'] ?? null;
+if (!is_null($restrictions)) {
+   $input['users']    = AbstractRightsDropdown::getPostedIds($restrictions, User::class);
+   $input['groups']   = AbstractRightsDropdown::getPostedIds($restrictions, Group::class);
+   $input['profiles'] = AbstractRightsDropdown::getPostedIds($restrictions, Profile::class);
+}
+
+// Update form
+$form->update($input);
+
+Html::back();

@@ -38,7 +38,7 @@ if (!(new Plugin())->isActivated('formcreator')) {
    Html::displayNotFoundError();
 }
 
-$formanswer = new PluginFormcreatorFormAnswer();
+$formanswer = PluginFormcreatorCommon::getFormAnswer();
 
 if (isset($_POST['update'])) {
    // Edit an existing target ticket
@@ -74,10 +74,10 @@ if (Session::getCurrentInterface() == 'helpdesk') {
    Html::helpHeader(__('Service catalog', 'formcreator'));
 } else {
    Html::header(
-      __('Form Creator', 'formcreator'),
+      $formanswer->fields['name'],
       '',
       'admin',
-      'PluginFormcreatorForm'
+      PluginFormcreatorForm::class
    );
 }
 

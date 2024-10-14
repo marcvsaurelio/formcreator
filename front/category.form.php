@@ -36,7 +36,7 @@ if (!(new Plugin())->isActivated('formcreator')) {
     Html::displayNotFoundError();
 }
 
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 $dropdown = new PluginFormcreatorCategory();
 

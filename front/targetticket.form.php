@@ -31,7 +31,7 @@
 
 include ('../../../inc/includes.php');
 
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 // Check if plugin is activated...
 if (!(new Plugin())->isActivated('formcreator')) {
@@ -98,7 +98,7 @@ if (isset($_POST['update'])) {
       'PluginFormcreatorForm'
    );
 
-   Html::requireJs('plugin_formcreator_tags');
+
    $targetTicket->getFromDB((int) $_REQUEST['id']);
    $form = PluginFormcreatorForm::getByItem($targetTicket);
    $_SESSION['glpilisttitle'][$targetTicket::getType()] = sprintf(

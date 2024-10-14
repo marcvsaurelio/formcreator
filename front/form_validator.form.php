@@ -31,7 +31,7 @@
 
 include ('../../../inc/includes.php');
 
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 // Check if plugin is activated...
 if (!(new Plugin())->isActivated('formcreator')) {
@@ -42,10 +42,11 @@ if (!isset($_POST['plugin_formcreator_forms_id'])) {
    // should not happen
    Html::back();
 }
-$item = new PluginFormcreatorForm_Validator();
-if (isset($_POST['delete'])) {
-   Session::checkRight(PluginFormcreatorForm::$rightname, DELETE);
-   $item->delete($_POST);
-   Html::back();
+$form = PluginFormcreatorCommon::getForm();
+if (isset($_POST['save'])) {
+   $input = $_POST;
+   $input['id'] = (int) $_POST['plugin_formcreator_forms_id'];
+   unset($input['plugin_formcreator_forms_id']);
+   $form->update($input);
 }
 Html::back();

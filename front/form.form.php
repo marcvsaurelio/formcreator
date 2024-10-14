@@ -36,11 +36,11 @@ if (!(new Plugin())->isActivated('formcreator')) {
    Html::displayNotFoundError();
 }
 
-$form = new PluginFormcreatorForm();
+$form = PluginFormcreatorCommon::getForm();
 
 if (isset($_POST['add'])) {
    // Add a new Form
-   Session::checkRight(PluginFormcreatorForm::$rightname, CREATE);
+   Session::checkRight('entity', UPDATE);
    $_POST['_create_empty_section'] = true;
    if ($newID = $form->add($_POST)) {
       if ($_SESSION['glpibackcreated']) {
@@ -51,39 +51,31 @@ if (isset($_POST['add'])) {
 
 } else if (isset($_POST['update'])) {
    // Edit an existing form
-   Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+   Session::checkRight('entity', UPDATE);
    $form->update($_POST);
    Html::back();
 
 } else if (isset($_POST['delete'])) {
    // Delete a form (is_deleted = true)
-   Session::checkRight(PluginFormcreatorForm::$rightname, DELETE);
+   Session::checkRight('entity', UPDATE);
    $form->delete($_POST);
    $form->redirectToList();
 
 } else if (isset($_POST['restore'])) {
    // Restore a deleteted form (is_deleted = false)
-   Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+   Session::checkRight('entity', UPDATE);
    $form->restore($_POST);
    $form->redirectToList();
 
 } else if (isset($_POST['purge'])) {
    // Delete defenitively a form from DB and all its datas
-   Session::checkRight(PluginFormcreatorForm::$rightname, PURGE);
+   Session::checkRight('entity', UPDATE);
    $form->delete($_POST, 1);
    $form->redirectToList();
 
 } else if (isset($_POST['add_target'])) {
-   Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+   Session::checkRight('entity', UPDATE);
    $form->addTarget($_POST);
-   Html::back();
-
-} else if (isset($_POST['add_validator'])) {
-   Session::checkRight(PluginFormcreatorForm::$rightname, CREATE);
-   $form->getFromDB($_POST['id']);
-   unset($_POST['uuid']);
-   $formValidator = new PluginFormcreatorForm_Validator();
-   $formValidator->addMultipleItems($_POST);
    Html::back();
 
 } else if (isset($_POST['filetype_create'])) {
@@ -104,8 +96,7 @@ if (isset($_POST['add'])) {
 
 } else if (isset($_GET['import_form'])) {
    // Import form
-   Session::checkRight(PluginFormcreatorForm::$rightname, CREATE);
-   Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+   Session::checkRight('entity', UPDATE);
    Html::header(
       PluginFormcreatorForm::getTypeName(2),
       $_SERVER['PHP_SELF'],
@@ -129,14 +120,13 @@ if (isset($_POST['add'])) {
    );
 
    // Import form
-   Session::checkRight(PluginFormcreatorForm::$rightname, CREATE);
-   Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+   Session::checkRight('entity', UPDATE);
    $form->importJson($_REQUEST);
    Html::back();
 
 } else {
    // Show forms form
-   Session::checkRight(PluginFormcreatorForm::$rightname, READ);
+   Session::checkRight('entity', UPDATE);
 
    Html::header(
       PluginFormcreatorForm::getTypeName(Session::getPluralNumber()),
