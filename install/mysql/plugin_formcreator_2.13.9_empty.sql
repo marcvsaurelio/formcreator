@@ -139,7 +139,6 @@ CREATE TABLE IF NOT EXISTS `glpi_plugin_formcreator_questions` (
   `width`                          int(11)      NOT NULL DEFAULT '0',
   `show_rule`                      int(11)      NOT NULL DEFAULT '1',
   `uuid`                           varchar(255) DEFAULT NULL,
-  `annotation`                     varchar(255) DEFAULT NULL COMMENT 'Annotation to question, never display in in Wizard',
   PRIMARY KEY (`id`),
   INDEX `plugin_formcreator_sections_id` (`plugin_formcreator_sections_id`),
   FULLTEXT KEY `Search` (`name`,`description`)
