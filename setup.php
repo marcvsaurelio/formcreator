@@ -33,16 +33,16 @@ use Glpi\Plugin\Hooks;
 
 global $CFG_GLPI;
 // Version of the plugin (major.minor.bugfix)
-define('PLUGIN_FORMCREATOR_VERSION', '2.14.0-dev');
+define('PLUGIN_FORMCREATOR_VERSION', '2.13.9.1');
 // Schema version of this version (major.minor only)
-define('PLUGIN_FORMCREATOR_SCHEMA_VERSION', '2.14');
+define('PLUGIN_FORMCREATOR_SCHEMA_VERSION', '2.13');
 // is or is not an official release of the plugin
-define('PLUGIN_FORMCREATOR_IS_OFFICIAL_RELEASE', false);
+define('PLUGIN_FORMCREATOR_IS_OFFICIAL_RELEASE', true);
 
 // Minimal GLPI version, inclusive
-define ('PLUGIN_FORMCREATOR_GLPI_MIN_VERSION', '10.0.5');
+define ('PLUGIN_FORMCREATOR_GLPI_MIN_VERSION', '10.0.10');
 // Maximum GLPI version, exclusive (ignored if PLUGIN_FORMCREATOR_IS_OFFICIAL_RELEASE == false)
-define ('PLUGIN_FORMCREATOR_GLPI_MAX_VERSION', '10.2');
+define ('PLUGIN_FORMCREATOR_GLPI_MAX_VERSION', '10.1');
 
 define('FORMCREATOR_ROOTDOC', Plugin::getWebDir('formcreator'));
 
@@ -72,10 +72,7 @@ function plugin_version_formcreator() {
       'requirements'   => [
          'glpi'           => [
             'min'            => PLUGIN_FORMCREATOR_GLPI_MIN_VERSION,
-         ],
-         'php'          => [
-            'min'            => '8.0.2',
-         ],
+         ]
       ]
    ];
 
@@ -332,9 +329,6 @@ function plugin_formcreator_hook(): void {
       PluginFormcreatorCommon::class, 'hookPostShowTab',
    ];
 
-   // declare specific JavaScript
-   $PLUGIN_HOOKS['javascript']['plugin_formcreator_tags'][] = Plugin::getWebDir('formcreator', false) . '/js/tag.js';
-
    // Load JS and CSS files if we are on a page which need them
    if (isset($_SERVER['REQUEST_URI'])) {
       if (strpos($_SERVER['REQUEST_URI'], 'formcreator') !== false
@@ -397,7 +391,7 @@ function plugin_formcreator_hook(): void {
    $PLUGIN_HOOKS[Hooks::REDEFINE_MENUS]['formcreator'] = [PluginFormcreatorCommon::class, 'hookRedefineMenu'];
 
    // Config page
-   if (Session::haveRightsOr(PluginFormcreatorForm::$rightname, [READ, UPDATE, CREATE, DELETE, PURGE])) {
+   if (Session::haveRight('entity', UPDATE)) {
       $PLUGIN_HOOKS['menu_toadd']['formcreator']['admin'] = PluginFormcreatorForm::class;
    }
 }
@@ -418,8 +412,6 @@ function plugin_formcreator_registerClasses() {
    ]);
 
    Plugin::registerClass(PluginFormcreatorEntityconfig::class, ['addtabon' => Entity::class]);
-
-   Plugin::registerClass(PluginFormcreatorProfile::class, ['addtabon' => Profile::class]);
 }
 
 function plugin_formcreator_redirect() {
@@ -523,8 +515,8 @@ function plugin_formcreator_redirect() {
 
    $pages = [
       'front/reservationitem.php' => FORMCREATOR_ROOTDOC . '/front/reservationitem.php',
-      'front/helpdesk.faq.php' => FORMCREATOR_ROOTDOC . '/front/wizard.php',
-      'front/ticket.php' => FORMCREATOR_ROOTDOC . '/front/issue.php',
+      // 'front/helpdesk.faq.php' => FORMCREATOR_ROOTDOC . '/front/wizard.php',
+      //'front/ticket.php' => FORMCREATOR_ROOTDOC . '/front/issue.php',
    ];
    foreach ($pages as $srcPage => $dstPage) {
       if (strpos($_SERVER['REQUEST_URI'], $srcPage) !== false && strpos($_SERVER['REQUEST_URI'], $dstPage) === false) {
@@ -549,20 +541,14 @@ function plugin_formcreator_options() {
  * @return string|null
  */
 function plugin_formcreator_getSchemaPath(string $version = null): ?string {
-   $version = $version ?? PLUGIN_FORMCREATOR_VERSION;
+   if ($version === null) {
+      $version = PLUGIN_FORMCREATOR_VERSION;
+   }
 
    // Drop suffixes for alpha, beta, rc versions
    $matches = [];
-   preg_match('/^(\d+\.\d+\.\d+)/', $version, $matches);
+   preg_match('/^((\d+\.\d+\.\d+\.\d+)?(\d+\.\d+\.\d+)?)/', $version, $matches);
    $version = $matches[1];
-
-   $matches = [];
-   preg_match('/^(\d+\.\d+\.\d+)/', PLUGIN_FORMCREATOR_VERSION, $matches);
-   $current_version = $matches[1];
-
-   if ($version === $current_version) {
-      return Plugin::getPhpDir('formcreator') . "/install/mysql/plugin_formcreator_empty.sql";
-   }
 
    return Plugin::getPhpDir('formcreator') . "/install/mysql/plugin_formcreator_{$version}_empty.sql";
 }
