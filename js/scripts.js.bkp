@@ -160,7 +160,7 @@ function updateCategoriesView() {
       // Show label of parent in the 'back' item
       document.querySelectorAll('#plugin_formcreator_wizard_categories .slinky-menu a.back').forEach(item => {
          var parentLabel = item.closest('ul').closest('li').querySelector('a').innerText;
-         item.innerText = parentLabel;
+         item.innerHTML = parentLabel;
       });
 
       $('#plugin_formcreator_wizard_categories a.back').on('click',
@@ -286,40 +286,34 @@ function sortFormAndFaqItems(items, byName) {
    }
    return items;
 }
+/******************************************************** EDITADO POR MARCUS AURELIO ****************************************/
+function showTiles(tiles, defaultForms, itilcategory_id = undefined) {
+   var sortByName = $('#plugin_formcreator_alphabetic').prop('checked');
+   tiles = sortFormAndFaqItems(tiles, sortByName);  // Removi a segunda declaração var para evitar redefinição
 
-function showTiles(tiles, defaultForms) {
-   var sortByName = $('#plugin_formcreator_alphabetic').prop('checked')
-   var tiles = sortFormAndFaqItems(tiles, sortByName);
    var html = '';
    if (defaultForms) {
       if (tiles.length > 0) {
          html += '<p>' + i18n.textdomain('formcreator').__('No form found. Please choose a form below instead.', 'formcreator') + '</p>';
       } else {
-         html += '<p>' + i18n.textdomain('formcreator').__('No form found.', 'formcreator') + '</p>';
+         html += '<p>' + i18n.textdomain('formcreator').__('No form found.', 'formcreator') + '</p>';  // Corrigido a mensagem vazia
       }
    } else {
       if (tiles.length < 1) {
          html += '<p>' + i18n.textdomain('formcreator').__('No FAQ item found.', 'formcreator') + '</p>';
       }
    }
-   html += buildTiles(tiles);
 
-   //Display tiles
+   // Inclui o parâmetro itilcategory_id
+   html += buildTiles(tiles, itilcategory_id); 
+
+   // Display tiles
    $('#plugin_formcreator_wizard_forms').empty();
    $('#plugin_formcreator_wizard_forms').prepend(html);
-   $('#plugin_formcreator_formlist').masonry({
-      horizontalOrder: true,
-      gutter: 10
-   });
-   $('#plugin_formcreator_faqlist').masonry({
-      horizontalOrder: true,
-      gutter: 10
-   });
 
-
-   $(".plugin_formcreator_formTile_description.tile_design_uniform_height").each(function( index ) {
+   $(".plugin_formcreator_formTile_description.tile_design_uniform_height").each(function(index) {
       var length = 150;
-      //decrease length if contain icon
+      // Decrease length if contain icon
       if ($(this).parent().find(".fa").length > 0) {
          length = length - 35;
       }
@@ -334,10 +328,8 @@ function showTiles(tiles, defaultForms) {
          $(this).html(short);
       }
    });
-
-
 }
-
+/*******************************************************************************************************************************/
 function buildKbCategoryList(tree) {
    var html = '';
    if (tree.id != 0) {
@@ -358,44 +350,83 @@ function buildKbCategoryList(tree) {
    html = html + '</ul>';
    return html;
 }
-
+/******************************************************** EDITADO POR MARCUS AURELIO *******************************************/
 function buildCategoryList(tree) {
    var html = '';
+   
+   // Checa se o ID da categoria não é 0
    if (tree.id != 0) {
-      html = '<a href="#" data-parent-category-id="' + tree.parent +'"'
-         + ' data-category-id="' + tree.id + '"'
-         + ' onclick="plugin_formcreator.updateWizardFormsView(this)"'
-         + ' title="' + tree.comment + '">'
-         + tree.name
-         + '</a>';
+      // Se a categoria não deve ser exibida
+      if (tree.is_display < 1) {
+         html = '<a href="#" data-parent-category-id="' + tree.parent + '"'
+            + ' data-category-id="' + tree.id + '"'
+            + ' onclick="plugin_formcreator.updateWizardFormsView(this)"'
+            + ' title="' + tree.comment + '">'
+            + tree.name
+            + '</a>';
+      } else { // Caso contrário, exibe o layout com a imagem
+         html = '<a href="#" data-parent-category-id="' + tree.parent + '" '
+            + 'data-category-id="' + tree.id + '" '
+            + 'onclick="plugin_formcreator.updateWizardFormsView(this)"'
+            + 'style="height:120px !important;">'  // Corrigido o !important para estar correto
+            + '<div style="width: 100%; height: 100%;">'
+            + '<table style="width: 150px; height: 110px; border-radius: 20px; background-color: #e6e6e6; margin: 0 auto;">'
+            + '<tbody>'
+            + '<tr style="height: 75px;">'
+            + '<td align="center" style="width: 110px;">'
+            + '<div style="width: 100%; height: 100%; margin: 0 auto; text-decoration: none; color: #000;">'
+            + '<img src="' + tree.url_image + '"'
+            + 'title="' + tree.name + '"'
+            + 'style="width: 75px; height: 75px; text-decoration: none; color: #000; margin: 0 auto;"/>'
+            + '</div>'
+            + '</td>'
+            + '</tr>'
+            + '<tr style="height: 35px;">'
+            + '<td align="center" style="width: 150px;">'
+            + tree.name  // Removi a interpolação redundante de string
+            + '</td>'
+            + '</tr>'
+            + '</tbody>'
+            + '</table>'
+            + '</div>'
+            + '</a>';
+      }
    }
+
+   // Checa se há subcategorias para exibir
    if (Object.keys(tree.subcategories).length == 0) {
       return html;
    }
-   html = html + '<ul>';
+
+   // Constrói a lista de subcategorias
+   html += '<ul>';
    $.each(tree.subcategories, function (key, val) {
-      html = html + '<li>' + buildCategoryList(val) + '</li>';
+      html += '<li style="height: auto;">' + buildCategoryList(val) + '</li>';
    });
-   html = html + '</ul>';
+   html += '</ul>';
+   
    return html;
 }
-
-
+/****************************************************************************************************************************/
+/******************************************************** EDITADO POR MARCUS AURELIO ****************************************/
 function buildTiles(list) {
    // Listener para clique nas tiles
-   $(document).on('click', '.plugin_formcreator_formTile', function(){
+   $(document).on('click', '.plugin_formcreator_formTile', function() {
       document.location = $(this).children('a').attr('href');
    });
 
    var html = '';
+   
+   // Verifica se há itens na lista
    if (list.length == 0) {
+      html = '<div>Nenhum formulário encontrado.</div>';
       return html;
    }
 
    var forms = [];
    var faqs = [];
 
-   $.each(list, function (key, item) {
+   $.each(list, function(key, item) {
       // Construir o URL
       var url = formcreatorRootDoc + '/front/formdisplay.php?id=' + item.id;
       if (item.type != 'form') {
@@ -404,22 +435,13 @@ function buildTiles(list) {
 
       // Aplicar o design do tile
       var tiles_design = "";
-      if (item.tile_template == "1") { 
+      if (item.tile_template == "1") {
          tiles_design = "tile_design_uniform_height"; // Template padrão
       }
 
       var description = '';
-      // Customização para formulários com imagens
-      if (item.type === 'form' && item.is_display === 'true' && item.url_image !== '') {
-         description = '<div style="width: 100%; height: 100%; margin:0 auto;">' +
-            '<img src="' + item.url_image + '" alt="' + item.description + '" width=75 height=75 style="text-decoration:none; color: #000;">' +
-            '</div>';
-      } else {
-         if (item.description) {
-            description = '<div class="plugin_formcreator_formTile_description ' + tiles_design + '">'
-               + item.description
-               + '</div>';
-         }
+      if (item.description) {
+         description = '<div class="plugin_formcreator_formTile_description ' + tiles_design + '">' + item.description + '</div>';
       }
 
       var default_class = '';
@@ -434,62 +456,40 @@ function buildTiles(list) {
       item.icon_color = item.icon_color || '#999999';
       item.background_color = item.background_color || '#e7e7e7';
 
-      // Adicionar formulários com ou sem imagem
       if (item.type === 'form') {
-         if (item.is_display === 'true' && item.url_image !== '') {
-            forms.push(
-               '<div class="plugin_formcreator_formTile ' + item.type + ' ' + default_class + '" style="width: 200px !important; background-color: transparent !important; margin: 10px;">' +
-                  '<a href="' + url + '" title="' + item.description + '">' +
-                  '<table style="width: 200px; height: 130px; border-radius: 20px; background-color: ' + item.background_color + '">' +
-                     '<tbody>' +
-                        '<tr style="height: 35px;">' +
-                           '<td align="center" style="text-align: center; width: 200px;">' +
-                              '<div style="width: 100%; height: 100%; margin:0 auto; color: ' + item.icon_color + ';">' +
-                                 item.name +
-                              '</div>' +
-                           '</td>' +
-                        '</tr>' +
-                        '<tr style="height: 85px;">' +
-                           '<td align="center" style="text-align: center;">' +
-                              description +
-                           '</td>' +
-                        '</tr>' +
-                     '</tbody>' +
-                  '</table>' +
-                  '</a>' +
-               '</div>'
-            );
-         } else {
-            forms.push(
-               '<div data-itemtype="PluginFormcreatorForm" data-id="' + item.id + '" style="background-color: ' + item.background_color + '" class="plugin_formcreator_formTile ' + item.type + ' ' + tiles_design + ' ' + default_class + '" title="' + item.description + '">' +
-                  '<i class="' + item.icon + '" style="color: ' + item.icon_color + '"></i>' +
-                  '<a href="' + url + '" class="plugin_formcreator_formTile_title">' +
-                     item.name +
-                  '</a>' +
-                  description +
-               '</div>'
-            );
-         }
+         forms.push(
+            '<div data-itemtype="PluginFormcreatorForm" data-id="' + item.id + '" style="background-color: ' + item.background_color + '" class="plugin_formcreator_formTile ' + item.type + ' ' + tiles_design + ' ' + default_class + '" title="' + item.description + '">' +
+               '<i class="' + item.icon + '" style="color: ' + item.icon_color + '"></i>' +
+               '<a href="' + url + '" class="plugin_formcreator_formTile_title">' + item.name + '</a>' +
+               description +
+            '</div>'
+         );
       } else {
-         // Manter as FAQs sem alteração
          faqs.push(
-            '<div style="background-color: ' + item.background_color + '" class="plugin_formcreator_formTile ' + item.type + ' ' + tiles_design + ' ' + default_class + '" title="' + item.description + '">'
-            + '<i class="fa ' + item.icon + '" style="color: ' + item.icon_color + '"></i>'
-            + '<a href="' + url + '" class="plugin_formcreator_formTile_title">'
-            + item.name
-            + '</a>'
-            + description
-            + '</div>'
+            '<div style="background-color: ' + item.background_color + '" class="plugin_formcreator_formTile ' + item.type + ' ' + tiles_design + ' ' + default_class + '" title="' + item.description + '">' +
+               '<i class="fa ' + item.icon + '" style="color: ' + item.icon_color + '"></i>' +
+               '<a href="' + url + '" class="plugin_formcreator_formTile_title">' + item.name + '</a>' +
+               description +
+            '</div>'
          );
       }
    });
 
    // Concatenar HTML final
-   html = '<div id="plugin_formcreator_formlist">' + forms.join("") + '</div>';
-   html += '<div id="plugin_formcreator_faqlist">' + faqs.join("") + '</div>';
+   if (forms.length > 0) {
+      html = '<div id="plugin_formcreator_formlist">' + forms.join('') + '</div>';
+   } else {
+      html = '<div>Nenhum formulário encontrado.</div>';
+   }
+
+   if (faqs.length > 0) {
+      html += '<div id="plugin_formcreator_faqlist">' + faqs.join('') + '</div>';
+   }
 
    return html;
 }
+/********************************************************************************************************************************/
+
 
 var plugin_formcreator = new function() {
    this.spinner = '<div"><img src="../../../pics/spinner.48.gif" style="margin-left: auto; margin-right: auto; display: block;" width="48px"></div>'
@@ -1272,23 +1272,17 @@ var plugin_formcreator = new function() {
       if (item) {
          this.activeCategory = item.getAttribute('data-category-id');
       }
-      $.when(getFormAndFaqItems(this.activeCategory))
+      $.when(getFormAndFaqItems(this.activeCategory), this.activeCategory)
       .done(
-         function (response) {
+         function (response, itilcategory_id) {
             tiles = response.forms;
-            showTiles(tiles, response.default);
+            showTiles(tiles, response.default, itilcategory_id);
          }
       ).fail(
          function () {
             var html = '<p>' + i18n.textdomain('formcreator').__('An error occured while querying forms', 'formcreator') + '</p>'
             $('#plugin_formcreator_wizard_forms').empty();
             $('#plugin_formcreator_wizard_forms').prepend(html);
-            $('#plugin_formcreator_formlist').masonry({
-               horizontalOrder: true
-            });
-            $('#plugin_formcreator_faqlist').masonry({
-               horizontalOrder: true
-            });
          }
       );
    }
@@ -1297,22 +1291,17 @@ var plugin_formcreator = new function() {
       if (item) {
          this.activeCategory = item.getAttribute('data-category-id');
       }
-      $.when(getFaqItems(this.activeCategory)).done(
-         function (response) {
+      $.when(getFaqItems(this.activeCategory), this.activeCategory)
+      .done(
+         function (response, itilcategory_id) {
             tiles = response.forms;
-            showTiles(tiles, false);
+            showTiles(tiles, response.default, itilcategory_id);
          }
       ).fail(
          function () {
             var html = '<p>' + i18n.textdomain('formcreator').__('An error occured while querying forms', 'formcreator') + '</p>'
             $('#plugin_formcreator_wizard_forms').empty();
             $('#plugin_formcreator_wizard_forms').prepend(html);
-            $('#plugin_formcreator_formlist').masonry({
-               horizontalOrder: true
-            });
-            $('#plugin_formcreator_faqlist').masonry({
-               horizontalOrder: true
-            });
          }
       );
    }
