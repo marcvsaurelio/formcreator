@@ -626,6 +626,44 @@ JAVASCRIPT;
       return $document;
    }
 
+   /**
+    * Get an empty form answer object from Formcreator or Advanced Formcreator
+    * Advanced Formcreator redefines some methods of thos class
+    *
+    * TODO: This method is unful as lon tehre is no dependency injection in
+    * GLPI
+    *
+    * @return PluginFormcreatorFormAnswer
+    */
+   public static function getFormAnswer(): PluginFormcreatorFormAnswer {
+      if (Plugin::isPluginActive(PLUGIN_FORMCREATOR_ADVANCED_VALIDATION)) {
+         return new PluginAdvformFormAnswer();
+      }
+
+      return new PluginFormcreatorFormAnswer();
+   }
+
+   /**
+    * Get the real itemtype for form answer implementation, depending on the availability of Advanced Formcreator
+    *
+    * @return string
+    */
+   public static function getFormanswerItemtype() {
+      if (Plugin::isPluginActive(PLUGIN_FORMCREATOR_ADVANCED_VALIDATION)) {
+         return PluginAdvformFormAnswer::class;
+      }
+
+      return PluginFormcreatorFormAnswer::class;
+   }
+
+   public static function getForm() {
+      if (Plugin::isPluginActive(PLUGIN_FORMCREATOR_ADVANCED_VALIDATION)) {
+         return new PluginAdvformForm();
+      }
+
+      return new PluginFormcreatorForm();
+   }
+
    public static function getInterface() {
       if (Session::getCurrentInterface() == 'helpdesk') {
          if (plugin_formcreator_replaceHelpdesk()) {
@@ -740,12 +778,13 @@ JAVASCRIPT;
       }
 
       $newMenu = [];
+
       $newMenu['seek_assistance'] = [
          'default' => Plugin::getWebDir('formcreator', false) . '/front/wizard.php',
          'title'   => __('Seek assistance', 'formcreator'),
          'icon'    => 'fa-fw ti ti-headset',
       ];
-      if (Ticket::canView()) {
+	  	        if (Ticket::canView()) {
          $newMenu['my_assistance_requests'] = [
             'default' => PluginFormcreatorIssue::getSearchURL(false),
             'title'   => __('My requests for assistance', 'formcreator'),
@@ -761,6 +800,18 @@ JAVASCRIPT;
             ],
          ];
       }
+	  	  
+      $newMenu['satisfaction_survey'] = [
+               'default' =>  Ticket::getSearchURL(false).'?is_deleted=0&as_map=0&browse=0&criteria[0][link]=AND&criteria[0][field]=12&criteria[0][searchtype]=equals&criteria[0][value]=6&criteria[1][link]=AND&criteria[1][field]=61&criteria[1][searchtype]=contains&criteria[1][value]=NULL&criteria[2][link]=AND&criteria[2][field]=60&criteria[2][searchtype]=morethan&_select_criteria[2][value]=-3DAY&criteria[2][value]=-3DAY&criteria[3][link]=AND&criteria[3][field]=4&criteria[3][searchtype]=equals&criteria[3][value]=myself&itemtype=Ticket&start=0&_glpi_csrf_token=7dfebdb9d70530698c9c1ae39cc4c649d7aa58f2ab9c279526edf62e06b8c38d&sort[]=19&order[]=DESC',
+               'title'   => __('Satisfaction survey'),
+               'icon'    => 'fa-fw ti ti-star',
+            ];
+      $newMenu['waiting_approval'] = [
+         'default' =>  Ticket::getSearchURL(false).'?is_deleted=0&as_map=0&browse=0&criteria[0][link]=AND&criteria[0][field]=12&criteria[0][searchtype]=equals&criteria[0][value]=notold&criteria[1][link]=AND&criteria[1][field]=55&criteria[1][searchtype]=equals&criteria[1][value]=2&itemtype=Ticket&start=0&_glpi_csrf_token=6be8d2debf65db9a3b040dce8e744ce2f05c3e38a6e8454f2eb0ba6e2d3f7dfa&sort[]=19&order[]=DESC',
+         'title'   => __('Aguardando Aprovação'),
+         'icon'    => 'fa-fw ti ti-check',
+      ];
+
 
       if (PluginFormcreatorEntityConfig::getUsedConfig('is_kb_separated', Session::getActiveEntity()) == PluginFormcreatorEntityConfig::CONFIG_KB_DISTINCT
          && Session::haveRight('knowbase', KnowbaseItem::READFAQ)
@@ -768,7 +819,7 @@ JAVASCRIPT;
          $newMenu['faq'] = $menus['faq'];
          $newMenu['faq']['default'] = Plugin::getWebDir('formcreator', false) . '/front/knowbaseitem.php';
       }
-      if (Session::haveRight("reservation", ReservationItem::RESERVEANITEM)) {
+      if (Session::haveRightsOr("reservation", [READ, ReservationItem::RESERVEANITEM])) {
          if (isset($menus['reservation'])) {
             $newMenu['reservation'] = $menus['reservation'];
          }
@@ -781,7 +832,6 @@ JAVASCRIPT;
          'ORDER'    => "$reminderTable.name"
       ];
       $criteria = $criteria + Reminder::getVisibilityCriteria();
-      $criteria['WHERE']["$reminderTable.users_id"] = ['<>', Session::getLoginUserID()];
       $iterator = $DB->request($criteria);
       $hasReminder = $iterator->count() > 0;
 
@@ -820,14 +870,6 @@ JAVASCRIPT;
          $newMenu[$menu_name] = $menu_data;
       }
 
-      if (PluginFormcreatorEntityconfig::getUsedConfig('is_folded_menu', Session::getActiveEntity()) == PluginFormcreatorEntityconfig::CONFIG_LEFT_MENU_FOLDED) {
-         $_SESSION['glpifold_menu'] = 1;
-      }
-
-      if (PluginFormcreatorEntityconfig::getUsedConfig('is_folded_menu', Session::getActiveEntity()) == PluginFormcreatorEntityconfig::CONFIG_LEFT_MENU_FOLDED) {
-         $_SESSION['glpifold_menu'] = 1;
-      }
-
       return $newMenu;
    }
 
@@ -849,19 +891,5 @@ JAVASCRIPT;
          $dashboard->show(true);
          echo "</div>";
       }
-   }
-
-   public static function showGenericSearchIssue(): void {
-      //backup session value
-      $save_session_fold_search = $_SESSION['glpifold_search'];
-      //hide search if need
-      if (PluginFormcreatorEntityconfig::getUsedConfig('is_search_issue_visible', Session::getActiveEntity()) == PluginFormcreatorEntityconfig::CONFIG_SEARCH_ISSUE_HIDDEN) {
-         $_SESSION['glpifold_search'] = true;
-      }
-
-      Search::show(PluginFormcreatorIssue::class);
-
-      //restore session value
-      $_SESSION['glpifold_search'] = $save_session_fold_search;
    }
 }

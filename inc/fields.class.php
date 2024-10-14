@@ -366,7 +366,7 @@ class PluginFormcreatorFields
     * @return array
     */
    public static function updateVisibility($input) {
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $form->getFromDB((int) $input['plugin_formcreator_forms_id']);
       $fields = $form->getFields();
       foreach ($fields as $id => $field) {
@@ -383,10 +383,9 @@ class PluginFormcreatorFields
 
       // Get the visibility result of sections
       $sectionToShow = [];
-      $sectionsGenerator = PluginFormcreatorSection::getSectionsFromForm($form->getID());
-      /** @var PluginFormcreatorSection $section */
-      foreach ($sectionsGenerator as $sectionId => $section) {
-         $sectionToShow[$sectionId] = PluginFormcreatorFields::isVisible($section, $fields);
+      $sections = (new PluginFormcreatorSection)->getSectionsFromForm($form->getID());
+      foreach ($sections as $section) {
+         $sectionToShow[$section->getID()] = PluginFormcreatorFields::isVisible($section, $fields);
       }
 
       return [

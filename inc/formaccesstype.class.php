@@ -29,8 +29,6 @@
  * ---------------------------------------------------------------------
  */
 
- use Glpi\Application\View\TemplateRenderer;
-
 if (!defined('GLPI_ROOT')) {
    die("Sorry. You can't access this file directly");
 }
@@ -56,13 +54,81 @@ class PluginFormcreatorFormAccessType extends CommonGLPI
    }
 
    public static function showForForm(CommonDBTM $item, $withtemplate = '') {
-      $item->initForm($item->getID());
-      TemplateRenderer::getInstance()->display('@formcreator/pages/form_accesstype.html.twig', [
-         'item' => $item,
-         'params' => [
-            'candel' => false,
-         ],
+      global $CFG_GLPI;
+
+      echo "<form name='form_profiles_form' id='form_profiles_form'
+             method='post' action='";
+      echo Toolbox::getItemTypeFormURL(__CLASS__)."'>";
+      echo '<table class="tab_cadre_fixe">';
+
+      echo '<tr><th colspan="2">'._n('Access type', 'Access types', 1, 'formcreator').'</th>';
+      echo '</tr>';
+
+      // Access type
+      echo '<tr>';
+      echo '<td>';
+      Dropdown::showFromArray(
+         'access_rights',
+         PluginFormcreatorForm::getEnumAccessType(),
+         [
+            'value' => $item->fields['access_rights'] ?? PluginFormcreatorForm::ACCESS_PRIVATE,
+            'on_change' => 'plugin_formcreator.showMassiveRestrictions(this)',
+         ]
+      );
+      echo '</td>';
+      echo '<td>'.__('Link to the form', 'formcreator').': ';
+      if ($item->fields['is_active']) {
+         $parsedBaseUrl = parse_url($CFG_GLPI['url_base']);
+         $baseUrl = $parsedBaseUrl['scheme'] . '://' . $parsedBaseUrl['host'];
+         if (isset($parsedBaseUrl['port'])) {
+            $baseUrl .= ':' . $parsedBaseUrl['port'];
+         }
+         $form_url = $baseUrl . FORMCREATOR_ROOTDOC . '/front/formdisplay.php?id='.$item->getID();
+         echo '<a href="'.$form_url.'">'.$form_url.'</a>&nbsp;';
+         echo '<a href="mailto:?subject='.$item->getName().'&body='.$form_url.'" target="_blank">';
+         echo '<i class="fas fa-envelope"><i/>';
+         echo '</a>';
+      } else {
+         echo __('Please activate the form to view the link', 'formcreator');
+      }
+      echo '</td>';
+      echo '</tr>';
+
+      // Captcha
+      $is_visible = $item->fields["access_rights"] == PluginFormcreatorForm::ACCESS_PUBLIC;
+      echo '<tr id="plugin_formcreator_captcha" style="display: ' . ($is_visible ? 'block' : 'none') . '">';
+      echo '<td>' . __('Enable captcha', 'formcreator') . '</td>';
+      echo '<td>';
+      Dropdown::showYesNo('is_captcha_enabled', $item->fields['is_captcha_enabled']);
+      echo '</td>';
+      echo '</tr>';
+
+      // Access restrictions
+      $is_visible = $item->fields["access_rights"] == PluginFormcreatorForm::ACCESS_RESTRICTED;
+      echo '<tr id="plugin_formcreator_restrictions_head" style="display: ' . ($is_visible ? 'block' : 'none') . '">';
+      echo '<th colspan="2">' . self::getTypeName(2) . '</th>';
+      echo '</tr>';
+      echo '<tr id="plugin_formcreator_restrictions" style="display: ' . ($is_visible ? 'block' : 'none') . '">';
+      echo '<td><label>' . __('Restricted to') . '</label></td>';
+      echo '<td class="restricted-form">';
+      echo PluginFormcreatorRestrictedFormDropdown::show('restrictions', [
+         'users_id'    => $item->fields['users'] ?? [],
+         'groups_id'   => $item->fields['groups'] ?? [],
+         'profiles_id' => $item->fields['profiles'] ?? [],
       ]);
+      echo '</td>';
+      echo '</tr>';
+
+      $formFk = PluginFormcreatorForm::getForeignKeyField();
+      echo '<tr>';
+      echo '<td class="center" colspan="2">';
+      echo Html::hidden($formFk, ['value' => $item->fields['id']]);
+      echo '<input type="submit" class="btn btn-primary me-2" name="update" value="'.__('Save').'" class="submit" />';
+      echo "</td>";
+      echo "</tr>";
+
+      echo "</table>";
+      Html::closeForm();
    }
 
    /**

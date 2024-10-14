@@ -47,7 +47,7 @@ PluginFormcreatorTranslatableInterface
    use PluginFormcreatorExportableTrait;
    use PluginFormcreatorTranslatable;
 
-   static $rightname = 'plugin_formcreator_form';
+   static $rightname = 'entity';
 
    public $dohistory = true;
 
@@ -74,7 +74,7 @@ PluginFormcreatorTranslatableInterface
    }
 
    public static function canCreate() {
-      return Session::haveRight(self::$rightname, CREATE);
+      return Session::haveRight('entity', UPDATE);
    }
 
    public static function canView() {
@@ -82,11 +82,11 @@ PluginFormcreatorTranslatableInterface
    }
 
    public static function canDelete() {
-      return Session::haveRight(self::$rightname, DELETE);
+      return Session::haveRight('entity', UPDATE);
    }
 
    public static function canPurge() {
-      return Session::haveRight(self::$rightname, PURGE);
+      return Session::haveRight('entity', UPDATE);
    }
 
    public function canPurgeItem() {
@@ -98,7 +98,7 @@ PluginFormcreatorTranslatableInterface
       if ($DbUtil->countElementsInTable(PluginFormcreatorFormAnswer::getTable(), $criteria) > 0) {
          return false;
       }
-      return Session::haveRight(self::$rightname, UPDATE);
+      return Session::haveRight('entity', UPDATE);
    }
 
    /**
@@ -133,7 +133,12 @@ PluginFormcreatorTranslatableInterface
    }
 
    public function rawSearchOptions() {
-      $tab = parent::rawSearchOptions();
+      $tab = [];
+
+      $tab[] = [
+         'id'                 => 'common',
+         'name'               => __('Characteristics')
+      ];
 
       $tab[] = [
          'id'                 => '2',
@@ -141,6 +146,15 @@ PluginFormcreatorTranslatableInterface
          'field'              => 'id',
          'name'               => __('ID'),
          'searchtype'         => 'contains',
+         'massiveaction'      => false
+      ];
+
+      $tab[] = [
+         'id'                 => '1',
+         'table'              => $this::getTable(),
+         'field'              => 'name',
+         'name'               => __('Name'),
+         'datatype'           => 'itemlink',
          'massiveaction'      => false
       ];
 
@@ -290,13 +304,28 @@ PluginFormcreatorTranslatableInterface
 
       $tab[] = [
          'id'                 => '36',
-         'table'              => $this::getTable(),
-         'field'              => 'name',
-         'datatype'           => 'dropdown',
-         'name'               => __('Next form', 'formcreator'),
-         'massiveaction'      => true,
-         // Add virtual condition to relink table
-         'joinparams'        => ['condition' => [new QueryExpression("1=1")]]
+         'table'              => $this->getTable(),
+         'field'              => 'annotation',
+         'name'               => __('annotation', 'formcreator'),
+         'massiveaction'      => true
+      ];
+
+      $tab[] = [
+         'id'                 => '37',
+         'table'              => $this->getTable(),
+         'field'              => 'url_image',
+         'name'               => __('url_image', 'formcreator'),
+         'datatype'           => 'text',
+         'massiveaction'      => true
+      ];
+
+      $tab[] = [
+         'id'                 => '38',
+         'table'              => $this->getTable(),
+         'field'              => 'is_display',
+         'name'               => __('is_display', 'formcreator'),
+         'datatype'           => 'bool',
+         'massiveaction'      => true
       ];
 
       return $tab;
@@ -466,7 +495,7 @@ PluginFormcreatorTranslatableInterface
    /**
     * Show the Form for the adminsitrator to edit in the config page
     *
-    * @param  array  $options Optional options
+    * @param  Array  $options Optional options
     *
     * @return NULL   Nothing, just display the form
     */
@@ -494,10 +523,71 @@ PluginFormcreatorTranslatableInterface
    }
 
    public function showTargets($ID, $options = []) {
-      TemplateRenderer::getInstance()->display('@formcreator/pages/form_targets.html.twig', [
-         'item'    => $this,
-         'options' => $options
-      ]);
+      echo '<table class="tab_cadrehov">';
+      echo '<tr>';
+      echo '<th>'._n('Target', 'Targets', 2, 'formcreator').'</th>';
+      echo '<th>'._n('Type', 'Types', 1).'</th>';
+      echo '<th class="right">'.__('Actions', 'formcreator').'</th>';
+      echo '</tr>';
+
+      $allTargets = $this->getTargetsFromForm();
+      $i = 0;
+      foreach ($allTargets as $targetType => $targets) {
+         foreach ($targets as $targetId => $target) {
+            /** @var PluginFormcreatorAbstractTarget $target  */
+            $i++;
+            echo '<tr class="tab_bg_'.($i % 2).'">';
+            $targetItemUrl = $targetType::getFormURLWithID($targetId);
+            echo '<td><a href="' . $targetItemUrl . '">';
+            echo $target->fields['name'];
+            echo '</a></td>';
+
+            echo '<td>';
+            echo $target->getTypeName();
+            echo '</td>';
+
+            echo '<td align="center" width="32">';
+            echo '<i
+               class="far fa-clone plugin_formcreator_duplicate_target"
+               alt="*"
+               title="' . __('Duplicate', 'formcreator') . '"
+               data-itemtype="' . get_class($target) . '"
+               data-items-id="' . $targetId . '"
+               align="absmiddle"
+               style="cursor: pointer"
+            ></i>';
+            echo '&nbsp;';
+            echo '<i
+               class="far fa-trash-alt plugin_formcreator_delete_target"
+               alt="*"
+               title="' . __('Delete', 'formcreator') . '"
+               data-itemtype="' . get_class($target) . '"
+               data-items-id="' . $targetId . '"
+               align="absmiddle"
+               style="cursor: pointer"
+            ></i>';
+            echo '</td>';
+
+            echo '</tr>';
+         }
+      }
+
+      // Display add target link...
+      echo '<tr class="tab_bg_'.(($i + 1) % 2).' id="add_target_row">';
+      echo '<td colspan="3">';
+      echo '<a href="javascript:plugin_formcreator_addTarget('.$ID.');">
+                <i class="fa fa-plus"></i>
+                '.__('Add a target', 'formcreator').'
+            </a>';
+      echo '</td>';
+      echo '</tr>';
+
+      // OR display add target form
+      echo '<tr id="add_target_form" style="display: none;">';
+      echo '<td colspan="3" id="add_target_form_td"></td>';
+      echo '</tr>';
+
+      echo "</table>";
    }
 
    public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0) {
@@ -513,7 +603,7 @@ PluginFormcreatorTranslatableInterface
          ];
       }
       if ($item->getType() == Central::class) {
-         return _n('Form', 'Forms', Session::getPluralNumber(), 'formcreator');
+         return PluginFormcreatorForm::getTypeName(Session::getPluralNumber());
       }
       return '';
    }
@@ -550,7 +640,7 @@ PluginFormcreatorTranslatableInterface
          return;
       }
       if ($item->getType() == Central::getType()) {
-         $form = new PluginFormcreatorForm();
+         $form = PluginFormcreatorCommon::getForm();
          $form->showForCentral();
       }
    }
@@ -583,37 +673,20 @@ PluginFormcreatorTranslatableInterface
    }
 
    public function showServiceCatalog() : void {
-      $need_request_list = false;
-      if (PluginFormcreatorEntityconfig::getUsedConfig('home_page', Session::getActiveEntity()) == PluginFormcreatorEntityconfig::CONFIG_HOME_PAGE_FORM_AND_REQUEST) {
-         $need_request_list = true;
-      }
-
       echo '<div id="plugin_formcreator_wizard" class="card-group">';
-      $this->showWizard($need_request_list);
+      $this->showWizard();
       echo '</div>';
-
-      if ($need_request_list) {
-         echo "<br/>";
-         echo "<br/>";
-         PluginFormcreatorCommon::showGenericSearchIssue();
-      }
    }
 
-   public function showWizard(bool $need_request_list = false) : void {
-      $class = "";
-      if ($need_request_list) {
-         $class = "plugin_formcreator_merge_with_request";
-      }
+   public function showWizard() : void {
+      echo '<div id="plugin_formcreator_wizard_categories" class="card">';
+      echo HTML::hidden('entityconfigs_show_forms_child', ['value' => PluginFormcreatorEntityconfig::getUsedConfig('show_forms_child', Session::getActiveEntity())]);
 
-      if (PluginFormcreatorEntityconfig::getUsedConfig('is_category_visible', Session::getActiveEntity()) == PluginFormcreatorEntityconfig::CONFIG_CATEGORY_VISIBLE) {
-         echo '<div id="plugin_formcreator_wizard_categories" class="card '.$class.'">';
-
-         echo '<div><h2 class="card-title">'._n("Category", "Categories", 2, 'formcreator').'</h2></div>';
-         echo '<div class="category-divider"></div>';
-         echo '<div class="slinky-menu"></div>';
-         echo '<div><a href="#" id="wizard_seeall">' . __('See all', 'formcreator') . '</a></div>';
-         echo '</div>';
-      }
+      echo '<div><h2 class="card-title">'._n("Category", "Categories", 2, 'formcreator').'</h2></div>';
+      echo '<div class="category-divider"></div>';
+      echo '<div class="slinky-menu"></div>';
+      echo '<div><a href="#" id="wizard_seeall">' . __('See all', 'formcreator') . '</a></div>';
+      echo '</div>';
 
       echo '<div id="plugin_formcreator_wizard_right" class="card">';
       echo '<div class="card-body">';
@@ -679,7 +752,7 @@ PluginFormcreatorTranslatableInterface
 
       $formList = self::getFormListQuery();
       $formList['SELECT'] = [
-         $table_form => ['id', 'name', 'icon', 'icon_color', 'background_color', 'description', 'usage_count', 'is_default'],
+         $table_form => ['id', 'name', 'icon', 'icon_color', 'background_color', 'description', 'usage_count', 'is_default', 'is_display', 'url_image', PluginFormcreatorCategory::getForeignKeyField()],
       ];
       $formList['LEFT JOIN'][$table_cat] = [
          'FKEY' => [
@@ -763,6 +836,10 @@ PluginFormcreatorTranslatableInterface
             'usage_count'      => $form['usage_count'],
             'is_default'       => $form['is_default'] ? "true" : "false",
             'tile_template'    => $display_format,
+            'annotation'       => isset($form['annotation']) ? $form['annotation'] : '', // Verificação adicionada
+            'is_display'       => $form['is_display'] ? "true" : "false",
+            'url_image'        => $form['url_image'],
+            PluginFormcreatorCategory::getForeignKeyField() => $form[PluginFormcreatorCategory::getForeignKeyField()],
          ];
       }
 
@@ -855,26 +932,12 @@ PluginFormcreatorTranslatableInterface
       echo '</form>';
    }
 
-   /**
-    * Undocumented function
-    *
-    * @param integer $limit max count of items to show
-    * @return void
-    */
-   protected function showMyLastForms(int $limit = 5) : void {
-      $showColumns = [
-         2, // id
-         1, // name
-         6, // request date
-         8, // status
-      ];
-      $this->showMyLastFormsAsRequester($showColumns, $limit);
-      if (PluginFormcreatorCommon::canValidate()) {
-         $this->showMyLastFormsAsValidator($showColumns, $limit);
-      }
-
-   }
-   protected function showMyLastFormsAsRequester(array $showColumns, $limit) {
+   protected function showMyLastForms() : void {
+      $limit = 5;
+      $formanswerUrl = PluginFormcreatorFormAnswer::getSearchURL();
+      $rawKeyBase = 'ITEM_' . PluginFormcreatorFormAnswer::class;
+      echo '<div id="plugin_formcreator_last_req_forms" class="card">';
+      echo '<div class="card-title">'.sprintf(__('My %1$d last forms (requester)', 'formcreator'), $limit).'</div>';
       $criteria = [
          'criteria' => [
             0 => [
@@ -890,20 +953,59 @@ PluginFormcreatorTranslatableInterface
             0 => 'DESC'
          ],
       ];
-
+      $showColumns = [
+         2, // id
+         1, // name
+         6, // request date
+         8, // status
+      ];
       $backupListLimit = $_SESSION['glpilist_limit'];
-      $_SESSION['glpilist_limit'] = $limit;
+      $_SESSION['glpilist_limit'] = 5;
       $search = Search::getDatas(PluginFormcreatorFormAnswer::class, $criteria, $showColumns);
       $_SESSION['glpilist_limit'] = $backupListLimit;
+      if ($search['data']['count'] == 0) {
+         echo '<div class="card-body text-center text-muted">'.__('No form posted yet', 'formcreator').'</div>';
+      } else {
+         echo '<div class="card-body">';
+         echo '<ul class="list-group">';
+         foreach ($search['data']['rows'] as $formAnswer) {
+            switch ($formAnswer['raw']["{$rawKeyBase}_8"]) {
+               case PluginFormcreatorFormAnswer::STATUS_WAITING:
+                  $status = CommonITILObject::WAITING;
+                  break;
+               case PluginFormcreatorFormAnswer::STATUS_REFUSED:
+                  $status = Change::REFUSED;
+                  break;
+               case PluginFormcreatorFormAnswer::STATUS_ACCEPTED:
+                  $status = CommonITILObject::ACCEPTED;
+                  break;
+               default:
+                  $status = $formAnswer['raw']["{$rawKeyBase}_8"];
+            }
+            $status = CommonITILObject::getStatusClass($status);
+            echo '<li data-itemtype="PluginFormcreatorFormanswer" data-id="'  . $formAnswer['raw']["{$rawKeyBase}_2"] . '">';
+            echo '<i class="'.$status.'"></i><a href="formanswer.form.php?id='. $formAnswer['raw']["{$rawKeyBase}_2"] .'">'. $formAnswer['raw']["{$rawKeyBase}_1"] .'</a>';
+            echo '<span class="plugin_formcreator_date">'.Html::convDateTime($formAnswer['raw']["{$rawKeyBase}_6"]).'</span>';
+            echo '</li>';
+         }
+         echo '</ul>';
+         echo '<div class="text-center  card-footer">';
+         $criteria = Toolbox::append_params($criteria, '&amp;');
+         echo '<a href="' . $formanswerUrl . '?' . $criteria . '">';
+         echo __('All my forms (requester)', 'formcreator');
+         echo '</a>';
+         echo '</div>';
+         echo '</div>';
+      }
+      echo '</div>';
 
-      TemplateRenderer::getInstance()->display('@formcreator/components/card/formanswer.requester-last.html.twig', [
-         'search' => $search,
-         'criteria' => $criteria,
-         'limit'    => $limit,
-      ]);
-   }
+      if (!PluginFormcreatorCommon::canValidate()) {
+         // The user cannot validate, then do not show the next card
+         return;
+      }
 
-   public function showMyLastFormsAsValidator(array $showColumns, $limit) {
+      echo '<div id="plugin_formcreator_val_forms" class="card mt-0 mt-sm-2">';
+      echo '<div class="card-title">'.sprintf(__('My %1$d last forms (validator)', 'formcreator'), $limit).'</div>';
       $criteria = [
          'criteria' => [
             0 => [
@@ -911,12 +1013,6 @@ PluginFormcreatorTranslatableInterface
                'searchtype' => 'equals',
                'value'      => 'myself',
             ],
-            1 => [
-               'link'       => 'OR',
-               'field'      => 7,
-               'searchtype' => 'equals',
-               'value'      => 'mygroups',
-            ]
          ],
          'sort' => [
             0 => 6
@@ -925,17 +1021,54 @@ PluginFormcreatorTranslatableInterface
             0 => 'DESC'
          ],
       ];
-
+      if (count($_SESSION['glpigroups'] ?? []) > 0) {
+         // The user is member of some groups, then add criteria for those groups
+         $criteria['criteria'][] = [
+            'link'       => 'OR',
+            'field'      => 7,
+            'searchtype' => 'equals',
+            'value'      => 'mygroups',
+         ];
+      }
       $backupListLimit = $_SESSION['glpilist_limit'];
-      $_SESSION['glpilist_limit'] = $limit;
+      $_SESSION['glpilist_limit'] = 5;
       $search = Search::getDatas(PluginFormcreatorFormAnswer::class, $criteria, $showColumns);
       $_SESSION['glpilist_limit'] = $backupListLimit;
-
-      TemplateRenderer::getInstance()->display('@formcreator/components/card/formanswer.validator-last.html.twig', [
-         'search'   => $search,
-         'criteria' => $criteria,
-         'limit'    => $limit,
-      ]);
+      if ($search['data']['count'] == 0) {
+         echo '<div class="card-body text-center text-muted" >'.__('No form waiting for validation', 'formcreator').'</div>';
+      } else {
+         echo '<div class="card-body">';
+         echo '<ul class="list-group">';
+         foreach ($search['data']['rows'] as $formAnswer) {
+            switch ($formAnswer['raw']["{$rawKeyBase}_8"]) {
+               case PluginFormcreatorFormAnswer::STATUS_WAITING:
+                  $status = CommonITILObject::WAITING;
+                  break;
+               case PluginFormcreatorFormAnswer::STATUS_REFUSED:
+                  $status = Change::REFUSED;
+                  break;
+               case PluginFormcreatorFormAnswer::STATUS_ACCEPTED:
+                  $status = CommonITILObject::ACCEPTED;
+                  break;
+               default:
+                  $status = $formAnswer['raw']["{$rawKeyBase}_8"];
+            }
+            $status = CommonITILObject::getStatusClass($status);
+            echo '<li data-itemtype="PluginFormcreatorFormanswer" data-id="'  . $formAnswer['raw']["{$rawKeyBase}_2"] . '">';
+            echo '<i class="'.$status.'"></i><a href="formanswer.form.php?id='. $formAnswer['raw']["{$rawKeyBase}_2"] .'">'. $formAnswer['raw']["{$rawKeyBase}_1"] .'</a>';
+            echo '<span class="plugin_formcreator_date">'.Html::convDateTime($formAnswer['raw']["{$rawKeyBase}_6"]).'</span>';
+            echo '</li>';
+         }
+         echo '</ul>';
+         echo '<div class="text-center card-footer">';
+         $criteria = Toolbox::append_params($criteria, '&amp;');
+         echo '<a href="' . $formanswerUrl . '?' . $criteria . '">';
+         echo __('All my forms (validator)', 'formcreator');
+         echo '</a>';
+         echo '</div>';
+         echo '</div>';
+      }
+      echo '</div>';
    }
 
    /**
@@ -1002,56 +1135,17 @@ PluginFormcreatorTranslatableInterface
          $input['formanswer_name'] = $input['name'] ?? $this->fields['formanswer_name'];
       }
 
-      if (!isset($input['validation_percent'])) {
-         $input['validation_percent'] = 100;
-      }
-
       if (!$this->skipChecks) {
          if (!$this->checkConditionSettings($input)) {
             $input['show_rule'] = PluginFormcreatorCondition::SHOW_RULE_ALWAYS;
          }
 
-         // if (!$this->checkValidators($input)) {
-         //    $input['validation_required'] = self::VALIDATION_NONE;
-         // }
-      }
-
-      //Check form redirect
-      $used_id = [];
-      if (($input['plugin_formcreator_forms_id'] ?? 0) > 0) {
-         $used_id[] = $input['plugin_formcreator_forms_id'];
-         $loop = self::checkLoop($input['plugin_formcreator_forms_id'], $used_id);
-         if ($loop) {
-            Session::addMessageAfterRedirect(
-               __('A loop is generated!', 'formcreator'),
-               false,
-               ERROR
-            );
-            return [];
+         if (!$this->checkValidators($input)) {
+            $input['validation_required'] = self::VALIDATION_NONE;
          }
       }
 
       return $input;
-   }
-
-   /**
-    * Check that building a sequence between 2 forms does not generate a loop
-    *
-    * @param int $form_id
-    * @param array $flow
-    * @return boolean true if a loop has been detected
-    */
-   public function checkLoop(int $form_id, array $flow): bool {
-      $form = new self();
-      if ($form->getFromDB($form_id) && $form->fields['plugin_formcreator_forms_id'] > 0) {
-         if (in_array($form->fields['plugin_formcreator_forms_id'], $flow)) {
-            return true;
-         } else {
-            $flow[] = $form->fields['plugin_formcreator_forms_id'];
-            return self::checkLoop($form->fields['plugin_formcreator_forms_id'], $flow);
-         }
-      }
-      return false;
    }
 
    /**
@@ -1145,7 +1239,17 @@ PluginFormcreatorTranslatableInterface
             if (!$this->checkAccessRight($input)) {
                return false;
             }
+
+            // if (!$this->checkConditionSettings($input)) {
+            //    $input['show_rule'] = PluginFormcreatorCondition::SHOW_RULE_ALWAYS;
+            // }
+
+            // if (!$this->checkValidators($input)) {
+            //    $input['validation_required'] = self::VALIDATION_NONE;
+            // }
          }
+
+         // return $input;
       }
 
       // Control fields values :
@@ -1177,22 +1281,6 @@ PluginFormcreatorTranslatableInterface
 
          if (!$this->checkValidators($input)) {
             $input['validation_required'] = self::VALIDATION_NONE;
-         }
-      }
-
-      //Check form redirect
-      $used_id = [];
-      if (($input['plugin_formcreator_forms_id'] ?? 0) > 0) {
-         $used_id[] = $input['id'];
-         $used_id[] = $input['plugin_formcreator_forms_id'];
-         $loop = self::checkLoop($input['plugin_formcreator_forms_id'], $used_id);
-         if ($loop) {
-            Session::addMessageAfterRedirect(
-               __('A loop is generated!', 'formcreator'),
-               false,
-               ERROR
-            );
-            return [];
          }
       }
 
@@ -1235,8 +1323,6 @@ PluginFormcreatorTranslatableInterface
     * @return bool
     */
    protected function checkValidators(array $input): bool {
-      global $DB;
-
       if (!isset($input['validation_required'])) {
          return true;
       }
@@ -1247,36 +1333,20 @@ PluginFormcreatorTranslatableInterface
             break;
 
          case self::VALIDATION_USER:
-            $not_users_count = $DB->request([
-               'COUNT' => 'c',
-               'FROM'  => PluginFormcreatorForm_Validator::getTable(),
-               'WHERE' => [
-                  self::getForeignKeyField() => $this->getID(),
-                  [
-                     'itemtype' => ['<>' => User::class],
-                  ], [
-                     'itemtype' => ['<>' => PluginFormcreatorSupervisorValidator::class]
-                  ],
-               ],
-            ]);
-            if ($not_users_count->current()['c'] > 0) {
-               return false;
-            }
+            $fieldName = '_validator_users';
             break;
 
          case self::VALIDATION_GROUP:
-            $not_groups_count = $DB->request([
-               'COUNT' => 'c',
-               'FROM'  => PluginFormcreatorForm_Validator::getTable(),
-               'WHERE' => [
-                  self::getForeignKeyField() => $this->getID(),
-                  'itemtype' => ['<>' => Group::class],
-               ],
-            ]);
-            if ($not_groups_count->current()['c'] > 0) {
-               return false;
-            }
+            $fieldName = '_validator_groups';
             break;
+      }
+
+      if (!isset($input[$fieldName])) {
+         return false;
+      }
+
+      if (is_array($input[$fieldName]) && count($input[$fieldName]) < 1) {
+         return false;
       }
 
       return true;
@@ -1320,9 +1390,6 @@ PluginFormcreatorTranslatableInterface
     * @return void
     */
    private function updateValidators() : void {
-      // method obsolete : disabled
-      return;
-
       if (!isset($this->input['validation_required'])) {
          return;
       }
@@ -1431,6 +1498,8 @@ PluginFormcreatorTranslatableInterface
    }
 
    /**
+    * @since version 0.85
+    *
     * @see CommonDBTM::showMassiveActionsSubForm()
     */
    public static function showMassiveActionsSubForm(MassiveAction $ma) {
@@ -1443,12 +1512,30 @@ PluginFormcreatorTranslatableInterface
             return true;
 
          case 'AccessRights':
-            TemplateRenderer::getInstance()->display('@formcreator/components/form/form_accesstype.massive.html.twig', [
-               'item' => new self(),
-               'params' => [
-                  'candel' => false,
-               ],
+            echo '<p></p>';
+            Dropdown::showFromArray(
+               'access_rights',
+               PluginFormcreatorForm::getEnumAccessType(),
+               [
+                  'value'     => PluginFormcreatorForm::ACCESS_PRIVATE,
+                  'on_change' => 'plugin_formcreator.showMassiveRestrictions(this)',
+               ]
+            );
+            echo '<p></p>';
+            echo '<div id="plugin_formcreator_restrictions_head" style="display: none">';
+            echo PluginFormcreatorFormAccessType::getTypeName(2);
+            echo '</div>';
+            echo '<div id="plugin_formcreator_restrictions" style="display: none">';
+            echo PluginFormcreatorRestrictedFormDropdown::show('restrictions', [
+               'users_id'    => [],
+               'groups_id'   => [],
+               'profiles_id' => [],
             ]);
+            echo '</div>';
+            echo '<div id="plugin_formcreator_captcha" style="display: none">';
+            echo __('Enable captcha', 'formcreator') . '&nbsp;';
+            Dropdown::showYesNo('is_captcha_enabled');
+            echo '</div>';
             echo '<br /><br />' . Html::submit(_x('button', 'Post'), ['name' => 'massiveaction']);
             return true;
 
@@ -1459,18 +1546,14 @@ PluginFormcreatorTranslatableInterface
    /**
     * Execute massive action for PluginFormcreatorFrom
     *
+    * @since version 0.85
+    *
     * @see CommonDBTM::processMassiveActionsForOneItemtype()
     */
    public static function processMassiveActionsForOneItemtype(MassiveAction $ma, CommonDBTM $item, array $ids) {
       switch ($ma->getAction()) {
          case 'Duplicate' :
-            if (!Session::haveRight(PluginFormcreatorForm::$rightname, CREATE)) {
-               $ma->itemDone($item->getType(), $ids, MassiveAction::ACTION_NORIGHT);
-               $ma->addMessage($item->getErrorMessage(ERROR_RIGHT));
-               return;
-            }
             foreach ($ids as $id) {
-               /**@var self $item  */
                if ($item->getFromDB($id) && $item->duplicate() !== false) {
                   Session::addMessageAfterRedirect(sprintf(__('Form duplicated: %s', 'formcreator'), $item->getName()));
                   $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
@@ -1481,11 +1564,6 @@ PluginFormcreatorTranslatableInterface
             }
             return;
          case 'Transfert' :
-            if (!Session::haveRight(PluginFormcreatorForm::$rightname, UPDATE)) {
-               $ma->itemDone($item->getType(), $ids, MassiveAction::ACTION_NORIGHT);
-               $ma->addMessage($item->getErrorMessage(ERROR_RIGHT));
-               return;
-            }
             foreach ($ids as $id) {
                if ($item->getFromDB($id) && $item->transfer($ma->POST['entities_id'])) {
                   Session::addMessageAfterRedirect(sprintf(__('Form Transfered: %s', 'formcreator'), $item->getName()));
@@ -1497,11 +1575,6 @@ PluginFormcreatorTranslatableInterface
             }
             return;
          case 'Export' :
-            if (!Session::haveRight(PluginFormcreatorForm::$rightname, READ)) {
-               $ma->itemDone($item->getType(), $ids, MassiveAction::ACTION_NORIGHT);
-               $ma->addMessage($item->getErrorMessage(ERROR_RIGHT));
-               return;
-            }
             foreach ($ids as $id) {
                if ($item->getFromDB($id)) {
                   $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
@@ -1584,18 +1657,8 @@ PluginFormcreatorTranslatableInterface
          $export['_plugin_formcreator_category'] = $formCategory->fields['completename'];
       }
 
-      // replace form next id
-      $export['_plugin_formcreator_form'] = '';
-      if ($export['plugin_formcreator_forms_id'] > 0) {
-         $nextForm = self::getById($export['plugin_formcreator_forms_id']);
-         if ($nextForm instanceof self) {
-            $export['_plugin_formcreator_form'] = $nextForm->fields['uuid'];
-         }
-      }
-
       // remove non needed keys
       unset($export['plugin_formcreator_categories_id'],
-            $export['plugin_formcreator_forms_id'],
             $export['entities_id'],
             $export['usage_count']);
 
@@ -1867,40 +1930,25 @@ PluginFormcreatorTranslatableInterface
       }
       $input[$formCategoryFk] = $formCategoryId;
 
-      // Import form next
-      $formNextFk = self::getForeignKeyField();
-      $formNextId = 0;
-      if ($input['_plugin_formcreator_form'] != '') {
-         /** @var self $formNext  */
-         $formNext = $linker->getObject($input['_plugin_formcreator_form'], self::class);
-         if ($formNext === false) {
-            $formNext = new self();
-            $formNext->getFromDBByCrit([
-               'uuid' => $input['_plugin_formcreator_form'],
-            ]);
-            if ($formNext->isNewItem()) {
-               $linker->postpone($input[$idKey], $item->getType(), $input, $containerId);
-               return false;
-            }
-         }
-         $formNextId = $formNext->getID();
-         $input[$formNextFk] = $formNextId;
-      }
-
       // Escape text fields
       foreach (['name', 'description', 'content', 'formanswer_name'] as $key) {
          $input[$key] = $DB->escape($input[$key]);
       }
 
+      // Do not process theses fields when adding / updating forms
+      // They will be imported later; see the variable $subItems below
+      $input2 = $input;
+      unset($input2['users'], $input2['groups'], $input2['profiles']);
+
       // Add or update the form
       $originalId = $input[$idKey];
       $item->skipChecks = true;
       if ($itemId !== false) {
-         $input['id'] = $itemId;
-         $item->update($input);
+         $input2['id'] = $itemId;
+         $item->update($input2);
       } else {
-         unset($input['id']);
-         $itemId = $item->add($input);
+         unset($input2['id']);
+         $itemId = $item->add($input2);
       }
       $item->skipChecks = false;
       if ($itemId === false) {
@@ -2012,7 +2060,7 @@ PluginFormcreatorTranslatableInterface
 
       echo '<table class="tab_cadrehov" id="plugin_formcreatorHomepageForms">';
       echo '<tr class="noHover">';
-      echo '<th><a href="' . FORMCREATOR_ROOTDOC . '/front/formlist.php">' . _n('Form', 'Forms', 2, 'formcreator') . '</a></th>';
+      echo '<th><a href="' . FORMCREATOR_ROOTDOC . '/front/formlist.php">' . PluginFormcreatorForm::getTypeName(Session::getPluralNumber()) . '</a></th>';
       echo '</tr>';
 
       $currentCategoryId = -1;
@@ -2089,7 +2137,7 @@ PluginFormcreatorTranslatableInterface
          return $item;
       }
 
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $formFk = self::getForeignKeyField();
 
       if ($DB->fieldExists($item::getTable(), $formFk)) {
@@ -2137,8 +2185,9 @@ PluginFormcreatorTranslatableInterface
          return $fields;
       }
 
-      $questionsGenerator = PluginFormcreatorQuestion::getQuestionsFromForm($this->getID());
-      foreach ($questionsGenerator as $id => $question) {
+      $question = new PluginFormcreatorQuestion();
+      $found_questions = $question->getQuestionsFromForm($this->getID());
+      foreach ($found_questions as $id => $question) {
          $fields[$id] = $question->getSubField();
       }
 
@@ -2214,7 +2263,7 @@ PluginFormcreatorTranslatableInterface
       ]);
       echo '</td>';
 
-      echo '<td width="15%"><strong>'._n('Type', 'Types', 1, 'formcreator').' <span style="color:red;">*</span></strong></td>';
+      echo '<td width="15%"><strong>'._n('Type', 'Types', 1).' <span style="color:red;">*</span></strong></td>';
       echo '<td width="30%">';
       $targetTypes = [];
       foreach (PluginFormcreatorForm::getTargetTypes() as $targetType) {
@@ -2408,7 +2457,7 @@ PluginFormcreatorTranslatableInterface
 
       $strings = $this->getMyTranslatableStrings($options);
 
-      foreach (PluginFormcreatorSection::getSectionsFromForm($this->getID()) as $section) {
+      foreach ((new PluginFormcreatorSection())->getSectionsFromForm($this->getID()) as $section) {
          foreach ($section->getTranslatableStrings($options) as $type => $subStrings) {
             $strings[$type] = array_merge($strings[$type], $subStrings);
          }
@@ -2581,20 +2630,7 @@ PluginFormcreatorTranslatableInterface
     * @return bool true if valdiation required, false otherwise
     */
    public function validationRequired(): bool {
-      global $DB;
-
-      // $result = $DB->request(PluginFormcreatorForm_Validator::getAllValidators($this, true));
-      // return $result->current()['c'] > 0;
-      $count = count($DB->request([
-         'SELECT' => 'id',
-         'FROM' => PluginFormcreatorForm_Validator::getTable(),
-         'WHERE' => [
-            PluginFormcreatorForm::getForeignKeyField() => $this->getID(),
-            'level' => 1,
-         ]
-      ]));
-
-      return ($count > 0);
+      return $this->fields['validation_required'] != self::VALIDATION_NONE;
    }
 
    /**
@@ -2737,51 +2773,5 @@ PluginFormcreatorTranslatableInterface
       }
 
       return $extra_header;
-   }
-
-   /**
-    * Undocumented function
-    *
-    * @param array $options
-    * @return string|int
-    */
-   public static function dropdownAccessType(array $options = []) {
-      $options['value'] = $options['value'] ?? self::ACCESS_PRIVATE;
-      return Dropdown::showFromArray(
-         $options['name'],
-         self::getEnumAccessType(),
-         $options
-      );
-   }
-
-   public function getUserFormUrl() {
-      global $CFG_GLPI;
-
-      $parsedBaseUrl = parse_url($CFG_GLPI['url_base']);
-      $baseUrl = $parsedBaseUrl['scheme'] . '://' . $parsedBaseUrl['host'];
-      if (isset($parsedBaseUrl['port'])) {
-         $baseUrl .= ':' . $parsedBaseUrl['port'];
-      }
-      $form_url = $baseUrl . FORMCREATOR_ROOTDOC . '/front/formdisplay.php?id=' . $this->getID();
-
-      return $form_url;
-   }
-
-   /*
-    * Get all tags availabie for targets of the form
-    *
-    * @param string $search Search string to filter tags
-    * @return array
-    */
-   public function getTags(string $search = ''): array {
-      $tags = [];
-
-      $questions = PluginFormcreatorQuestion::getQuestionsFromForm($this->getID());
-
-      foreach ($questions as $question) {
-         $tags = array_merge($tags, $question->getTags($search));
-      }
-
-      return $tags;
    }
 }

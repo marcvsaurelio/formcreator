@@ -77,7 +77,7 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
       return Ticket::class;
    }
 
-   protected static function getTemplateItemtypeName(): string {
+   protected function getTemplateItemtypeName(): string {
       return TicketTemplate::class;
    }
 
@@ -136,7 +136,7 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
                2 => __('Actors', 'formcreator'),
                3 => PluginFormcreatorCondition::getTypeName(1),
             ];
-            // if (Plugin::isPluginActive('fields')) {
+            // if ((new Plugin)->isActivated('fields')) {
             //    $tab[4] = __('Fields plugin', 'formcreator');
             // }
             return $tab;
@@ -272,11 +272,6 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
       $item->showLocationSettings($rand);
 
       // -------------------------------------------------------------------------------------------
-      //  Contracts
-      // -------------------------------------------------------------------------------------------
-      $item->showContractSettings($rand);
-
-      // -------------------------------------------------------------------------------------------
       // Validation selection
       // -------------------------------------------------------------------------------------------
       $item->showValidationSettings($rand);
@@ -331,7 +326,7 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
    public static function showPluginFields(self $item) {
       $formId = $item->getID();
 
-      $canEdit = Session::haveRight(PluginFormcreatorForm::$rightname, UPDATE);
+      $canEdit = Session::haveRight('entity', UPDATE);
 
       if ($canEdit) {
          // Global validation settings
@@ -670,20 +665,6 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
                   $input['location_question'] = '0';
             }
          }
-
-         if (isset($input['contract_rule'])) {
-            switch ($input['contract_rule']) {
-               case self::CONTRACT_RULE_ANSWER:
-                  $input['contract_question'] = $input['_contract_question'];
-                  break;
-               case self::CONTRACT_RULE_SPECIFIC:
-                  $input['contract_question'] = $input['_contract_specific'];
-                  break;
-               case self::CONTRACT_RULE_LAST_ANSWER:
-               default:
-                  $input['contract_question'] = '0';
-            }
-         }
       }
 
       if (isset($input['_linktype']) && isset($input['_link_itemtype'])) {
@@ -795,8 +776,7 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
    protected function getTargetTemplate(array $data): int {
       global $DB;
 
-      // TODO : check if we can replace this implementation by CommonITILObject::getITILTemplateToUse()
-      $targetItemtype = static::getTemplateItemtypeName();
+      $targetItemtype = $this->getTemplateItemtypeName();
       $targetTemplateFk = $targetItemtype::getForeignKeyField();
       if ($targetItemtype::isNewID($this->fields[$targetTemplateFk]) && !ITILCategory::isNewID($data['itilcategories_id'])) {
          $rows = $DB->request([
@@ -823,6 +803,8 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
     * @return Ticket|null Generated ticket if success, null otherwise
     */
    public function save(PluginFormcreatorFormAnswer $formanswer): ?CommonDBTM {
+      global $CFG_GLPI;
+
       $ticket  = new Ticket();
       $form = $formanswer->getForm();
       $data = $this->getDefaultData($formanswer);
@@ -852,29 +834,68 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
 
       $this->prepareActors($form, $formanswer);
 
+      if (count($this->requesters['_users_id_requester']) == 0) {
+         $this->addActor(PluginFormcreatorTarget_Actor::ACTOR_ROLE_REQUESTER, $formanswer->fields['requester_id'], true);
+         $requesters_id = $formanswer->fields['requester_id'];
+      } else {
+         $requesterAccounts = array_filter($this->requesters['_users_id_requester'], function($v) {
+            return ($v != 0);
+         });
+         $requesters_id = array_shift($requesterAccounts);
+         if ($requesters_id === null) {
+            // No account for requesters, then fallback on the account used to fill the answers
+            $requesters_id = $formanswer->fields['requester_id'];
+         }
+
+         // If only one requester, revert array of requesters into a scalar
+         // This is needed to process business rule affecting location of a ticket with the location of the user
+         if (count($this->requesters['_users_id_requester']) == 1) {
+            $this->requesters['_users_id_requester'] = array_pop($this->requesters['_users_id_requester']);
+         }
+      }
+
       $data['users_id_recipient'] = $formanswer->fields['requester_id'];
       $lastUpdater = Session::getLoginUserID();
       $data['users_id_lastupdater'] = $lastUpdater != '' ? $lastUpdater : 0;
 
-      $data = $this->setTargetRequesters($data, $formanswer);
       $data = $this->setTargetType($data, $formanswer);
       $data = $this->setTargetSource($data, $formanswer);
-      $data = $this->setTargetEntity($data, $formanswer, $this->firstRequester);
+      $data = $this->setTargetEntity($data, $formanswer, $requesters_id);
       $data = $this->setTargetDueDate($data, $formanswer);
       $data = $this->setSLA($data, $formanswer);
       $data = $this->setOLA($data, $formanswer);
       $data = $this->setTargetUrgency($data, $formanswer);
       $data = $this->setTargetPriority($data, $formanswer);
       $data = $this->setTargetLocation($data, $formanswer);
-      $data = $this->setTargetContract($data, $formanswer);
       $data = $this->setTargetAssociatedItem($data, $formanswer);
       $data = $this->setTargetValidation($data, $formanswer);
 
-      // Overwrite default actors only if populated
-      $data = $this->setTargetObservers($data, $formanswer);
-      $data = $this->setTargeAssigned($data, $formanswer);
-      $data = $this->setTargetSuppliers($data, $formanswer);
+      // There is always at least one requester
+      $data = $this->requesters + $data;
 
+      // Overwrite default actors only if populated
+      if (count($this->observers['_users_id_observer']) > 0) {
+         $data = $this->observers + $data;
+      }
+      if (count($this->assigned['_users_id_assign']) > 0) {
+         $data = $this->assigned + $data;
+      }
+      if (count($this->assignedSuppliers['_suppliers_id_assign']) > 0) {
+         $data = $this->assignedSuppliers + $data;
+      }
+      if (count($this->requesterGroups['_groups_id_requester']) > 0) {
+         $data = $this->requesterGroups + $data;
+      }
+      if (count($this->observerGroups['_groups_id_observer']) > 0) {
+         $data = $this->observerGroups + $data;
+      }
+      if (count($this->assignedGroups['_groups_id_assign']) > 0) {
+         $data = $this->assignedGroups + $data;
+      }
+
+      $data['items_id'] = $formanswer->getResponseItemsGLPiObject($formanswer->fields['id']);
+      
+      $data = $this->setDocuments($data, $formanswer);
       $data = $this->prepareUploadedFiles($data, $formanswer);
 
       $data = $this->appendFieldsData($data, $formanswer);
@@ -884,12 +905,25 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
 
       // Create the target ticket
       $data['_auto_import'] = true;
-      $data['_skip_sla_assign'] = true;
       if (!$ticketID = $ticket->add($data)) {
          return null;
       }
 
-      $this->saveTags($formanswer, $ticketID);
+      // Set default document category
+      $document_category = $CFG_GLPI['documentcategories_id_forticket'] ?? 0;
+      if ($document_category) {
+         foreach (array_keys($this->attachedDocuments) as $documents_id) {
+            $document = Document::getById($documents_id);
+            if (!$document) {
+               continue;
+            }
+
+            $document->update([
+               'id' => $document->fields['id'],
+               'documentcategories_id' => $document_category,
+            ]);
+         }
+      }
 
       // Add link between Ticket and FormAnswer
       $itemlink = $this->getItem_Item();
@@ -898,6 +932,8 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
          'items_id'   => $formanswer->fields['id'],
          'tickets_id' => $ticketID,
       ]);
+
+      $this->saveTags($formanswer, $ticketID);
 
       // Attach validation message as first ticket followup if validation is required and
       // if is set in ticket target configuration
@@ -943,8 +979,10 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
                   'plugin_formcreator_questions_id'   => $this->fields['location_question']
                ]
             ])->current();
-            if (isset($location['answer']) && ctype_digit($location['answer'])) {
+            if (isset($location['answer']) && !Location::isNewID($location['answer'])) {
                $location = $location['answer'];
+            } else {
+               $location = null;
             }
             break;
          case self::LOCATION_RULE_SPECIFIC:
@@ -1004,82 +1042,6 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
       }
       if (!is_null($location)) {
          $data['locations_id'] = $location;
-      }
-
-      return $data;
-   }
-
-   protected function setTargetContract($data, $formanswer) {
-      global $DB;
-
-      $contract = null;
-      switch ($this->fields['contract_rule']) {
-         case self::CONTRACT_RULE_ANSWER:
-            $contract = $DB->request([
-               'SELECT' => ['answer'],
-               'FROM'   => PluginFormcreatorAnswer::getTable(),
-               'WHERE'  => [
-                  'plugin_formcreator_formanswers_id' => $formanswer->fields['id'],
-                  'plugin_formcreator_questions_id'   => $this->fields['contract_question']
-               ]
-            ])->current();
-            if (isset($contract['answer']) && ctype_digit($contract['answer'])) {
-               $contract = $contract['answer'];
-            }
-            break;
-         case self::CONTRACT_RULE_SPECIFIC:
-            $contract = $this->fields['contract_question'];
-            break;
-         case self::CONTRACT_RULE_LAST_ANSWER:
-            $form_answer_id = $formanswer->fields['id'];
-
-            // Get all answers for dropdown questions of this form, ordered
-            // from last to first displayed
-            $answers = $DB->request([
-               'SELECT' => ['answer.plugin_formcreator_questions_id', 'answer.answer', 'question.values'],
-               'FROM' => PluginFormcreatorAnswer::getTable() . ' AS answer',
-               'JOIN' => [
-                  PluginFormcreatorQuestion::getTable() . ' AS question' => [
-                     'ON' => [
-                        'answer' => 'plugin_formcreator_questions_id',
-                        'question' => 'id',
-                     ]
-                  ]
-               ],
-               'WHERE' => [
-                  'answer.plugin_formcreator_formanswers_id' => $form_answer_id,
-                  'question.fieldtype'                       => "glpiselect",
-                  'question.itemtype'                        => Contract::class,
-               ],
-               'ORDER' => [
-                  'row DESC',
-                  'col DESC',
-               ]
-            ]);
-
-            foreach ($answers as $answer) {
-               // Decode dropdown settings
-               $question = PluginFormcreatorQuestion::getById($answer[PluginFormcreatorQuestion::getForeignKeyField()]);
-               $itemtype = $question->fields['itemtype'];
-
-               // Skip if question was not answered
-               if (empty($answer['answer'])) {
-                  continue;
-               }
-
-               // Skip if question is not visible
-               if (!$formanswer->isFieldVisible($answer['plugin_formcreator_questions_id'])) {
-                  continue;
-               }
-
-               // Found a valid answer, stop here
-               $contract = $answer['answer'];
-               break;
-            }
-            break;
-      }
-      if (!is_null($contract)) {
-         $data['_contracts_id'] = $contract;
       }
 
       return $data;
@@ -1420,7 +1382,6 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
          'category_rule'      => ['values' => self::CATEGORY_RULE_ANSWER, 'field' => 'category_question'],
          'associate_rule'     => ['values' => self::ASSOCIATE_RULE_ANSWER, 'field' => 'associate_question'],
          'location_rule'      => ['values' => self::LOCATION_RULE_ANSWER, 'field' => 'location_question'],
-         'contract_rule'      => ['values' => self::CONTRACT_RULE_ANSWER, 'field' => 'contract_question'],
          'destination_entity' => [
             'values' => [
                self::DESTINATION_ENTITY_ENTITY,
@@ -1443,6 +1404,16 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
             throw new ImportFailureException(sprintf(__('Failed to add or update the %1$s %2$s: a question is missing and is used in a parameter of the target', 'formceator'), $typeName, $input['name']));
          }
          $input[$fieldSetting['field']] = $question->getID();
+      }
+
+      // Find template by name
+      $input['tickettemplates_id'] = 0;
+      if (is_string($input['_tickettemplate']) && strlen($input['_tickettemplate']) > 0) {
+         $input['tickettemplates_id'] = self::getTemplateByName($input['_tickettemplate'] ?? '');
+         if ($input['tickettemplates_id'] === 0) {
+            $typeName = strtolower(self::getTypeName());
+            throw new ImportFailureException(sprintf(__('Failed to add or update the %1$s %2$s: It uses a non existent template', 'formceator'), $typeName, $input['name']));
+         }
       }
 
       // Add or update
@@ -1537,7 +1508,6 @@ class PluginFormcreatorTargetTicket extends PluginFormcreatorAbstractItilTarget
             'category_rule'      => ['values' => self::CATEGORY_RULE_ANSWER, 'field' => 'category_question'],
             'associate_rule'     => ['values' => self::ASSOCIATE_RULE_ANSWER, 'field' => 'associate_question'],
             'location_rule'      => ['values' => self::LOCATION_RULE_ANSWER, 'field' => 'location_question'],
-            'contract_rule'      => ['values' => self::CONTRACT_RULE_ANSWER, 'field' => 'contract_question'],
             'destination_entity' => [
                'values' => [
                   self::DESTINATION_ENTITY_ENTITY,

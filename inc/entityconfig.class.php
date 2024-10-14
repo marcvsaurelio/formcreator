@@ -69,17 +69,11 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
    const CONFIG_UI_FORM_MASONRY = 0;
    const CONFIG_UI_FORM_UNIFORM_HEIGHT = 1;
 
-   const CONFIG_HOME_PAGE_ONLY_FORM = 0;
-   const CONFIG_HOME_PAGE_FORM_AND_REQUEST = 1;
-
-   const CONFIG_CATEGORY_HIDDEN = 0;
-   const CONFIG_CATEGORY_VISIBLE = 1;
-
-   const CONFIG_LEFT_MENU_UNFOLDED = 0;
-   const CONFIG_LEFT_MENU_FOLDED = 1;
-
    const CONFIG_SERVICE_CATALOG_HOME_SEARCH = 0;
    const CONFIG_SERVICE_CATALOG_HOME_ISSUE = 1;
+   
+   const CONFIG_SHOW_CATEGORY_CATALOG_CHILD = 0;
+   const CONFIG_SHOW_CATEGORY_CATALOG_ONLY = 1;
 
    /**
     * @var bool $dohistory maintain history
@@ -90,7 +84,7 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
       $tabNames = [];
       if (!$withtemplate) {
          if ($item->getType() == 'Entity') {
-            $tabNames[1] = self::createTabEntry(_n('Form', 'Forms', Session::getPluralNumber(), 'formcreator'), 0, PluginFormcreatorForm::getType(), self::getIcon());
+            $tabNames[1] = PluginFormcreatorForm::getTypeName(Session::getPluralNumber());
          }
       }
       return $tabNames;
@@ -175,32 +169,11 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
       ];
    }
 
-   public static function getEnumHomePage() : array {
+   public static function getEnumCategoryChild() : array {
       return [
-         self::CONFIG_PARENT                       => __('Inheritance of the parent entity'),
-         self::CONFIG_HOME_PAGE_ONLY_FORM          => __('Only forms', 'formcreator'),
-         self::CONFIG_HOME_PAGE_FORM_AND_REQUEST   => __('Forms and list of requests', 'formcreator'),
+         self::CONFIG_SHOW_CATEGORY_CATALOG_CHILD => __('Show forms child', 'formcreator'),
+         self::CONFIG_SHOW_CATEGORY_CATALOG_ONLY => __('Show only forms the category', 'formcreator'),
       ];
-   }
-
-   public static function getEnumCategoryVisibility() : array {
-      return [
-         self::CONFIG_PARENT           => __('Inheritance of the parent entity'),
-         self::CONFIG_CATEGORY_VISIBLE => __('Visible', 'formcreator'),
-         self::CONFIG_CATEGORY_HIDDEN  => __('Hidden', 'formcreator'),
-      ];
-   }
-
-   public static function getEnumLeftMenuVisibility() : array {
-      return [
-         self::CONFIG_PARENT               => __('Inheritance of the parent entity'),
-         self::CONFIG_LEFT_MENU_FOLDED     => __('Folded', 'formcreator'),
-         self::CONFIG_LEFT_MENU_UNFOLDED   => __('Unfolded', 'formcreator'),
-      ];
-   }
-
-   public static function getIcon() {
-      return 'fas fa-edit';
    }
 
    public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0) {
@@ -253,6 +226,7 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
          'is_search_visible'      => self::CONFIG_PARENT,
          'is_dashboard_visible'   => self::CONFIG_PARENT,
          'is_header_visible'      => self::CONFIG_PARENT,
+         'show_forms_child'       => self::CONFIG_PARENT,
       ]);
 
       return $entityConfig;
@@ -453,49 +427,17 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
       }
       echo '</td></tr>';
 
-      // home page
-      $elements = self::getEnumHomePage();
+      // Category child catalog 
+      $elements = self::getEnumCategoryChild();
       if ($entityId == 0) {
          unset($elements[self::CONFIG_PARENT]);
       }
       echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Home page', 'formcreator')."</td>";
+      echo "<td>".__('Show forms child', 'formcreator')."</td>";
       echo "<td>";
-      Dropdown::showFromArray('home_page', $elements, ['value' => $this->fields['home_page']]);
-      if ($this->fields['home_page'] == self::CONFIG_PARENT) {
-         $tid = self::getUsedConfig('home_page', $entityId);
-         echo '<br>';
-         Entity::inheritedValue($elements[$tid], true);
-      }
-      echo '</td></tr>';
-
-      // category visibility
-      $elements = self::getEnumCategoryVisibility();
-      if ($entityId == 0) {
-         unset($elements[self::CONFIG_PARENT]);
-      }
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>"._n("Category", "Categories", 1, 'formcreator')."</td>";
-      echo "<td>";
-      Dropdown::showFromArray('is_category_visible', $elements, ['value' => $this->fields['is_category_visible']]);
-      if ($this->fields['is_category_visible'] == self::CONFIG_PARENT) {
-         $tid = self::getUsedConfig('is_category_visible', $entityId);
-         echo '<br>';
-         Entity::inheritedValue($elements[$tid], true);
-      }
-      echo '</td></tr>';
-
-      // left menu visibility (foelded / unfolded)
-      $elements = self::getEnumLeftMenuVisibility();
-      if ($entityId == 0) {
-         unset($elements[self::CONFIG_PARENT]);
-      }
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Menu visibility (only for vertical menu)', 'formcreator')."</td>";
-      echo "<td>";
-      Dropdown::showFromArray('is_folded_menu', $elements, ['value' => $this->fields['is_folded_menu']]);
-      if ($this->fields['is_folded_menu'] == self::CONFIG_PARENT) {
-         $tid = self::getUsedConfig('is_folded_menu', $entityId);
+      Dropdown::showFromArray('show_forms_child', $elements, ['value' => $this->fields['show_forms_child']]);
+      if ($this->fields['show_forms_child'] == self::CONFIG_PARENT) {
+         $tid = self::getUsedConfig('show_forms_child', $entityId);
          echo '<br>';
          Entity::inheritedValue($elements[$tid], true);
       }
@@ -633,6 +575,16 @@ class PluginFormcreatorEntityconfig extends CommonDBTM {
          'table'           => self::getTable(),
          'name'            => __('Tile design', 'formcreator'),
          'field'           => 'tile_design',
+         'datatype'        => 'integer',
+         'nosearch'        => true,
+         'massiveaction'   => false,
+      ];
+
+      $tab[] = [
+         'id'              => '14',
+         'table'           => self::getTable(),
+         'name'            => __('Show forms child', 'formcreator'),
+         'field'           => 'show_forms_child',
          'datatype'        => 'integer',
          'nosearch'        => true,
          'massiveaction'   => false,

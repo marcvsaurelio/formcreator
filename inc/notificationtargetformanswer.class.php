@@ -52,7 +52,7 @@ class PluginFormcreatorNotificationTargetFormAnswer extends NotificationTarget
    public function addDataForTemplate($event, $options = []) {
       global $CFG_GLPI;
 
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $form->getFromDB($this->obj->fields['plugin_formcreator_forms_id']);
       $link = $CFG_GLPI['url_base'] . $this->obj->getFormURLWithID($this->obj->getID(), false);
 
@@ -74,7 +74,7 @@ class PluginFormcreatorNotificationTargetFormAnswer extends NotificationTarget
       $this->data['##lang.formcreator.form_id##']            = __('Form ID', 'formcreator');
       $this->data['##lang.formcreator.form_name##']          = __('Form name', 'formcreator');
       $this->data['##lang.formcreator.form_requester##']     = _n('Requester', 'Requesters', 1);
-      $this->data['##lang.formcreator.form_validator##']     = _n('Validator', 'Validators', 1, 'formcreator');
+      $this->data['##lang.formcreator.form_validator##']     = PluginFormcreatorForm_Validator::getTypeName(1);
       $this->data['##lang.formcreator.form_creation_date##'] = __('Creation date', 'formcreator');
       $this->data['##lang.formcreator.form_full_answers##']  = __('Full form answers', 'formcreator');
       $this->data['##lang.formcreator.validation_comment##'] = __('Validation comment', 'formcreator');

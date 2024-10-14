@@ -30,8 +30,6 @@
  * ---------------------------------------------------------------------
  */
 
-use Glpi\Application\View\TemplateRenderer;
-
 if (!defined('GLPI_ROOT')) {
    die("Sorry. You can't access this file directly");
 }
@@ -59,46 +57,6 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
     */
    public function __construct(PluginFormcreatorQuestion $question) {
       $this->question = $question;
-   }
-
-   public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0): array {
-      return [
-         'condition' => PluginFormcreatorCondition::getTypeName(),
-      ];
-   }
-
-   public function displayTabContentForItem(CommonGLPI $item, string $tabnum): bool {
-      switch ($tabnum) {
-         case 'condition':
-            $this->showCondition();
-            return true;
-      }
-      return false;
-   }
-
-   public function showCondition() {
-      $template = '@formcreator/pages/question.condition.html.twig';
-      $parameters = $this->getParameters();
-      $options = [];
-      $options['candel'] = false;
-      $options['target'] = "javascript:;";
-      $options['formoptions'] = sprintf('onsubmit="plugin_formcreator.submitQuestion(this)" data-itemtype="%s" data-id="%s"', $this->question::getType(), $this->question->getID());
-      $options['addbuttons'] = [
-         'apply' => [
-            'type' => 'button',
-            'text' => __('Apply', 'formcreator'),
-            'onclick' => 'plugin_formcreator.editQuestion(this)',
-         ],
-      ];
-
-      TemplateRenderer::getInstance()->display($template, [
-         'item' => $this->question,
-         'params' => $options,
-         'question_params' => $parameters,
-         'no_header' => true,
-      ]);
-
-      return true;
    }
 
    public function setFormAnswer(PluginFormcreatorFormAnswer $form_answer): void {
@@ -202,10 +160,13 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
 
    /**
     * Gets the available values for the field
+    * @param array $values values to parse. If null, the values are ised from the instance of the question
     * @return array available values
     */
-   public function getAvailableValues() {
-      $values = json_decode($this->question->fields['values']);
+   public function getAvailableValues(array $values = null): array {
+      if ($values === null) {
+         $values = json_decode($this->question->fields['values']);
+      }
       $tab_values = [];
       foreach ($values as $value) {
          $trimmedValue = trim($value);
@@ -221,13 +182,11 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
    }
 
    /**
-    * trim values separated by \r\n
+    * trim and explode values separated by \r\n
     * @param string $value a value or default value
-    * @return string
+    * @return array
     */
-   protected function trimValue($value) {
-      global $DB;
-
+   protected function trimValue($value): array {
       $value = explode('\r\n', $value);
       // input has escpaed single quotes
       $value = Toolbox::stripslashes_deep($value);
@@ -241,7 +200,7 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
          $value
       );
 
-      return $DB->escape(json_encode($value, JSON_UNESCAPED_UNICODE));
+      return $value;
    }
 
    public function getFieldTypeName(): string {
@@ -270,7 +229,6 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
             'fieldname'                         => $fieldname,
          ]);
          if ($parameter->isNewItem()) {
-            // Create the missing parameter with defaults, but do not create it in DB
             $parameter->getEmpty();
          }
       }
@@ -292,6 +250,9 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
 
    public final function updateParameters(PluginFormcreatorQuestion $question, array $input) {
       $fieldTypeName = $this->getFieldTypeName();
+      if (!isset($input['_parameters'][$fieldTypeName])) {
+         return;
+      }
 
       foreach ($this->getParameters() as $fieldName => $parameter) {
          if (!isset($input['_parameters'][$fieldTypeName][$fieldName])) {
@@ -299,11 +260,9 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
          }
          $parameterInput = $input['_parameters'][$fieldTypeName][$fieldName];
          $parameterInput['plugin_formcreator_questions_id'] = $this->question->getID();
-         $parameterInput = array_merge($parameter->fields, $parameterInput);
          if ($parameter->isNewItem()) {
             // In case of the parameter vanished in DB, just recreate it
             unset($parameterInput['id']);
-            unset($parameterInput['uuid']); // uuid must be set automatically
             $parameter->add($parameterInput);
          } else {
             $parameterInput['id'] = $parameter->getID();
@@ -384,13 +343,5 @@ abstract class PluginFormcreatorAbstractField implements PluginFormcreatorFieldI
       $form = PluginFormcreatorForm::getByItem($this->question);
       $domain = PluginFormcreatorForm::getTranslationDomain($form->getID());
       return __($this->getLabel(), $domain);
-   }
-
-   public function isRenderedInTarget(): bool {
-      return true;
-   }
-
-   public function getTags(string $search = ''): array {
-      return [];
    }
 }

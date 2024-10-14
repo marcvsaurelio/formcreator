@@ -106,15 +106,8 @@ class PluginFormcreatorIssue extends CommonDBTM {
                'is_recursive        as is_recursive',
                'requester_id        as requester_id',
                'comment             as comment',
-               'requester_id        as users_id_recipient',
+               'requester_id        as users_id_recipient'
             ],
-            new QueryExpression('NULL                as `time_to_own`'),
-            new QueryExpression('NULL                as `time_to_resolve`'),
-            new QueryExpression('NULL                as `internal_time_to_own`'),
-            new QueryExpression('NULL                as `internal_time_to_resolve`'),
-            new QueryExpression('NULL                as `solvedate`'),
-            new QueryExpression('NULL                as `date`'),
-            new QueryExpression('0                   as `takeintoaccount_delay_stat`'),
          ],
          'DISTINCT' => true,
          'FROM' => $formAnswerTable,
@@ -168,14 +161,7 @@ class PluginFormcreatorIssue extends CommonDBTM {
             new QueryExpression('0                       as is_recursive'),
             new QueryExpression("COALESCE(`$ticketUserTable`.`users_id`, 0) as `requester_id`"),
             "$ticketTable.content                        as comment",
-            'users_id_recipient                          as users_id_recipient',
-            'time_to_own                                 as time_to_own',
-            'time_to_resolve                             as time_to_resolve',
-            'internal_time_to_own                        as internal_time_to_own',
-            'internal_time_to_resolve                    as internal_time_to_resolve',
-            'solvedate                                   as solvedate',
-            'date                                        as date',
-            'takeintoaccount_delay_stat                  as takeintoaccount_delay_stat',
+            'users_id_recipient                          as users_id_recipient'
          ],
          'DISTINCT' => true,
          'FROM' => $ticketTable,
@@ -503,8 +489,6 @@ class PluginFormcreatorIssue extends CommonDBTM {
    }
 
    public function rawSearchOptions() {
-      global $DB;
-
       $tab = [];
       $hide_technician = false;
       $hide_technician_group = false;
@@ -542,6 +526,10 @@ class PluginFormcreatorIssue extends CommonDBTM {
          'field'              => 'name',
          'name'               => __('Name'),
          'datatype'           => 'itemlink',
+         'searchtype'         => [
+            '0'                  => 'contains',
+            '1'                  => 'not contains',
+         ],
          'massiveaction'      => false,
          'additionalfields'   => [
             '0'                  => 'display_id'
@@ -561,7 +549,7 @@ class PluginFormcreatorIssue extends CommonDBTM {
          'id'                 => '3',
          'table'              => self::getTable(),
          'field'              => 'itemtype',
-         'name'               => _n('Type', 'Types', 1, 'formcreator'),
+         'name'               => _n('Type', 'Types', 1),
          'searchtype'         => [
             '0'                  => 'equals',
             '1'                  => 'notequals'
@@ -624,32 +612,28 @@ class PluginFormcreatorIssue extends CommonDBTM {
       }
       $tab[] = $newtab;
 
-      $newtab = [
-         'id'                 => '9',
-         'table'              => User::getTable(),
-         'field'              => 'name',
-         'name'               => __('Form approver', 'formcreator'),
-         'massiveaction'      => false,
-         'datatype'           => 'dropdown',
-         'forcegroupby'       => true,
-         'joinparams'         => [
-            'jointype'        => 'itemtype_item_revert',
-            'specific_itemtype' => User::getType(),
-            'beforejoin' => [
-               'table'      => PluginFormcreatorFormanswerValidation::getTable(),
-               'joinparams'    => [
-                  'jointype'   => 'child',
-                  'beforejoin' => [
-                     'table'              => PluginFormcreatorFormAnswer::getTable(),
-                     'joinparams'         => [
-                        'jointype'           => 'itemtype_item_revert',
-                        'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
-                     ],
-                  ],
+      if (Plugin::isPluginActive(PLUGIN_FORMCREATOR_ADVANCED_VALIDATION)) {
+         $newtab = PluginAdvformIssue::rawSearchOptionFormApprover();
+      } else {
+         $newtab = [
+            'id'                 => '9',
+            'table'              => User::getTable(),
+            'field'              => 'name',
+            'linkfield'          => 'users_id_validator',
+            'name'               => __('Form approver', 'formcreator'),
+            'datatype'           => 'dropdown',
+            'massiveaction'      => false,
+            'joinparams'         => [
+               'beforejoin'          => [
+                  'table'                => PluginFormcreatorFormAnswer::getTable(),
+                  'joinparams'           => [
+                     'jointype'          => 'itemtype_item_revert',
+                     'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
+                  ]
                ],
             ],
-         ],
-      ];
+         ];
+      }
       if (!Session::isCron() // no filter for cron
           && Session::getCurrentInterface() == 'helpdesk') {
          $newtab['right']       = 'id';
@@ -747,6 +731,7 @@ class PluginFormcreatorIssue extends CommonDBTM {
          'field'              => 'name',
          'name'               => __('Technician'),
          'datatype'           => 'dropdown',
+         'forcegroupby'       => true,
          'massiveaction'      => false,
          'nodisplay'          => $hide_technician,
          'nosearch'           => $hide_technician,
@@ -804,32 +789,28 @@ class PluginFormcreatorIssue extends CommonDBTM {
          ];
       }
 
-      $newtab = [
-         'id'                 => '16',
-         'table'              => Group::getTable(),
-         'field'              => 'completename',
-         'name'               => __('Form approver group', 'formcreator'),
-         'massiveaction'      => false,
-         'datatype'           => 'dropdown',
-         'forcegroupby'       => true,
-         'joinparams'         => [
-            'jointype'        => 'itemtype_item_revert',
-            'specific_itemtype' => Group::getType(),
-            'beforejoin' => [
-               'table'      => PluginFormcreatorFormanswerValidation::getTable(),
-               'joinparams'    => [
-                  'jointype'   => 'child',
-                  'beforejoin' => [
-                     'table'              => PluginFormcreatorFormAnswer::getTable(),
-                     'joinparams'         => [
-                        'jointype'           => 'itemtype_item_revert',
-                        'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
-                     ],
-                  ],
+      if (Plugin::isPluginActive(PLUGIN_FORMCREATOR_ADVANCED_VALIDATION)) {
+         $newtab = PluginAdvformIssue::rawSearchOptionFormApproverGroup();
+      } else {
+         $newtab = [
+            'id'                 => '16',
+            'table'              => Group::getTable(),
+            'field'              => 'completename',
+            'linkfield'          => 'groups_id_validator',
+            'name'               => __('Form approver group', 'formcreator'),
+            'datatype'           => 'itemlink',
+            'massiveaction'      => false,
+            'joinparams'         => [
+               'beforejoin'          => [
+                  'table'                => PluginFormcreatorFormAnswer::getTable(),
+                  'joinparams'           => [
+                     'jointype'          => 'itemtype_item_revert',
+                     'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
+                  ]
                ],
             ],
-         ],
-      ];
+         ];
+      }
       $tab[] = $newtab;
 
       if (version_compare(GLPI_VERSION, '10.1') >= 0) {
@@ -868,369 +849,11 @@ class PluginFormcreatorIssue extends CommonDBTM {
          $tab[] = $newtab;
       }
 
-      $tab[] = [
-         'id'                 => '20',
-         'table'              => $this->getTable(),
-         'field'              => 'time_to_resolve',
-         'name'               => __('Time to resolve'),
-         'datatype'           => 'datetime',
-         'maybefuture'        => true,
-         'massiveaction'      => false,
-         'additionalfields'   => ['solvedate', 'status']
-      ];
-
-      $tab[] = [
-         'id'                 => '21',
-         'table'              => $this->getTable(),
-         'field'              => 'time_to_resolve',
-         'name'               => __('Time to resolve + Progress'),
-         'massiveaction'      => false,
-         'nosearch'           => true,
-         'additionalfields'   => ['status'],
-      ];
-
-      $tab[] = [
-         'id'                 => '22',
-         'table'              => $this->getTable(),
-         'field'              => 'internal_time_to_resolve',
-         'name'               => __('Internal time to resolve'),
-         'datatype'           => 'datetime',
-         'maybefuture'        => true,
-         'massiveaction'      => false,
-         'additionalfields'   => ['solvedate', 'status']
-      ];
-
-      $tab[] = [
-         'id'                 => '23',
-         'table'              => $this->getTable(),
-         'field'              => 'internal_time_to_resolve',
-         'name'               => __('Internal time to resolve + Progress'),
-         'massiveaction'      => false,
-         'nosearch'           => true,
-         'additionalfields'   => ['status']
-      ];
-
-      $tab[] = [
-         'id'                 => '24',
-         'table'              => $this->getTable(),
-         'field'              => 'solvedate',
-         'name'               => __('Resolution date'),
-         'datatype'           => 'datetime',
-         'massiveaction'      => false
-      ];
-
-      $tab[] = [
-         'id'                 => '25',
-         'table'              => $this->getTable(),
-         'field'              => 'internal_time_to_own',
-         'name'               => __('Internal time to own'),
-         'datatype'           => 'datetime',
-         'maybefuture'        => true,
-         'massiveaction'      => false,
-         'additionalfields'   => ['date', 'status', 'takeintoaccount_delay_stat'],
-      ];
-
-      $tab[] = [
-         'id'                 => '26',
-         'table'              => $this->getTable(),
-         'field'              => 'internal_time_to_own',
-         'name'               => __('Internal time to own + Progress'),
-         'massiveaction'      => false,
-         'nosearch'           => true,
-         'additionalfields'   => ['status']
-      ];
-
-      $tab[] = [
-         'id'                 => '27',
-         'table'              => $this->getTable(),
-         'field'              => 'time_to_own',
-         'name'               => __('Time to own'),
-         'datatype'           => 'datetime',
-         'maybefuture'        => true,
-         'massiveaction'      => false,
-         'additionalfields'   => ['status']
-      ];
-
-      $tab[] = [
-         'id'                 => '28',
-         'table'              => $this->getTable(),
-         'field'              => 'time_to_own',
-         'name'               => __('Time to own + Progress'),
-         'massiveaction'      => false,
-         'nosearch'           => true,
-         'additionalfields'   => ['status']
-      ];
-
-      if (version_compare(GLPI_VERSION, '10.1') >= 0) {
-         $tab[] = [
-            'id'                 => '30',
-            'table'              => User::getTable(),
-            'field'              => 'name',
-            'linkfield'          => 'users_id_substitute',
-            'name'               => __('Approver substitute'),
-            'datatype'           => 'itemlink',
-            'forcegroupby'       => true,
-            'massiveaction'      => false,
-            'joinparams' => [
-               'beforejoin'         => [
-                  'table'           => ValidatorSubstitute::getTable(),
-                  'joinparams'         => [
-                     'jointype'           => 'child',
-                     'condition'          => [
-                        // same condition on search option 31, but with swapped expression
-                        // This workarounds identical complex join ID if a search use both search options 195 and 197
-                        [
-                           'OR' => [
-                              [
-                                 'REFTABLE.substitution_start_date' => null,
-                              ], [
-                                 'REFTABLE.substitution_start_date' => ['<=', $_SESSION['glpi_currenttime']],
-                              ],
-                           ],
-                        ], [
-                           'OR' => [
-                              [
-                                 'REFTABLE.substitution_end_date' => null,
-                              ], [
-                                 'REFTABLE.substitution_end_date' => ['>=', $_SESSION['glpi_currenttime']],
-                              ],
-                           ],
-                        ]
-                     ],
-                     'beforejoin'         => [
-                        'table'              => User::getTable(),
-                        'linkfield'          => ((version_compare(GLPI_VERSION, '10.1') >= 0) ? 'items_id_target' : 'users_id_validate'),
-                        'joinparams'             => [
-                           // Disabled for compatibility with GLPI 10.0 backport of substitutes
-                           'condition'                  => (version_compare(GLPI_VERSION, '10.1') >= 0) ? [
-                              'REFTABLE.itemtype_target' => User::class,
-                           ] : [],
-                           'beforejoin'             => [
-                              'table'                  => TicketValidation::getTable(),
-                              'linkfield'              => 'items_id',
-                              'joinparams'             => [
-                                 'jointype'               => 'child',
-                                 'beforejoin'             => [
-                                    'table'               => Ticket::getTable(),
-                                    'joinparams'              => [
-                                       'jointype'        => 'itemtype_item_revert',
-                                       'specific_itemtype'  => Ticket::class,
-                                    ],
-                                 ],
-                              ],
-                           ]
-                        ]
-                     ]
-                  ]
-               ],
-            ]
-         ];
-
-         $tab[] = [
-            'id'                 => '31',
-            'table'              => User::getTable(),
-            'field'              => 'name',
-            'linkfield'          => 'users_id_substitute',
-            'name'               => __('Substitute of a member of approver group'),
-            'datatype'           => 'itemlink',
-            'forcegroupby'       => true,
-            'massiveaction'      => false,
-            'joinparams'         => [
-               'beforejoin'         => [
-                  'table'          => ValidatorSubstitute::getTable(),
-                  'joinparams'         => [
-                     'jointype'           => 'child',
-                     'condition'          => [
-                        // same condition on search option 30, but with swapped expression
-                        // This workarounds identical complex join ID if a search use both search options 195 and 197
-                        [
-                           'OR' => [
-                              [
-                                 'REFTABLE.substitution_end_date' => null,
-                              ], [
-                                 'REFTABLE.substitution_end_date' => ['>=', $_SESSION['glpi_currenttime']],
-                              ],
-                           ],
-                        ], [
-                           'OR' => [
-                              [
-                                 'REFTABLE.substitution_start_date' => null,
-                              ], [
-                                 'REFTABLE.substitution_start_date' => ['<=', $_SESSION['glpi_currenttime']],
-                              ],
-                           ],
-                        ]
-                     ],
-                     'beforejoin'         => [
-                        'table'          => User::getTable(),
-                        'joinparams'         => [
-                           'beforejoin'         => [
-                              'table'          => Group_User::getTable(),
-                              'joinparams'         => [
-                                 'jointype'           => 'child',
-                                 'beforejoin'         => [
-                                    'table'              => Group::getTable(),
-                                    'linkfield'          => 'items_id_target',
-                                    'joinparams'         => [
-                                       'condition'          => [
-                                          'REFTABLE.itemtype_target' => Group::class,
-                                       ],
-                                       'beforejoin'         => [
-                                          'table'              => TicketValidation::getTable(),
-                                          'joinparams'         => [
-                                             'jointype'           => 'child',
-                                             'beforejoin'             => [
-                                                'table'               => Ticket::getTable(),
-                                                'joinparams'              => [
-                                                   'jointype'        => 'itemtype_item_revert',
-                                                   'specific_itemtype'  => Ticket::class,
-                                                ],
-                                             ],
-                                          ]
-                                       ]
-                                    ]
-                                 ]
-                              ]
-                           ]
-                        ]
-                     ]
-                  ]
-               ]
-            ]
-         ];
-
-         $tab[] = [
-            'id'                 => '32',
-            'table'              => User::getTable(),
-            'field'              => 'name',
-            'linkfield'          => 'users_id_validator',
-            'name'               => __('Form approver substitute', 'formcreator'),
-            'datatype'           => 'itemlink',
-            'forcegroupby'       => true,
-            'massiveaction'      => false,
-            'joinparams' => [
-               'beforejoin'         => [
-                  'table'           => ValidatorSubstitute::getTable(),
-                  'joinparams'         => [
-                     'jointype'           => 'child',
-                        // same condition on search option 30, but with swapped *SUB* expression
-                        // This workarounds identical complex join ID if a search use both search options 195 and 197
-                        'condition'          => [
-                        [
-                           'OR' => [
-                              [
-                                 'REFTABLE.substitution_start_date' => ['<=', $_SESSION['glpi_currenttime']],
-                              ], [
-                                 'REFTABLE.substitution_start_date' => null,
-                              ],
-                           ],
-                        ], [
-                           'OR' => [
-                              [
-                                 'REFTABLE.substitution_end_date' => ['>=', $_SESSION['glpi_currenttime']],
-                              ], [
-                                 'REFTABLE.substitution_end_date' => null,
-                              ],
-                           ],
-                        ]
-                     ],
-                     'beforejoin'         => [
-                        'table'              => User::getTable(),
-                        'linkfield'          => 'users_id_validator',
-                        'joinparams'             => [
-                           'beforejoin'             => [
-                              'table'                => PluginFormcreatorFormAnswer::getTable(),
-                              'joinparams'           => [
-                                 'jointype'          => 'itemtype_item_revert',
-                                 'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
-                              ]
-                           ]
-                        ]
-                     ]
-                  ]
-               ],
-            ]
-         ];
+      if (Plugin::isPluginActive(PLUGIN_FORMCREATOR_ADVANCED_VALIDATION)) {
+         foreach (PluginAdvformIssue::rawSearchOptions() as $so) {
+            $tab[] = $so;
+         }
       }
-
-      // This search option is identical to 'Form approver group'
-      // With a filter limiting to the levels waiting for validation
-      $filter = new DBmysqlIterator($DB);
-      $formAnswerFk = PluginFormcreatorFormAnswer::getForeignKeyField();
-      $filter->buildQuery([
-         'SELECT' => new QueryExpression("COALESCE(MAX(`level`), 0) + 1 AS `level`"),
-         'FROM' => PluginFormcreatorFormanswerValidation::getTable(),
-         'WHERE' => [
-            "$formAnswerFk" => new QueryExpression(PluginFormcreatorFormAnswer::getTable() .".id"),
-            ['NOT' => [
-               'status' => PluginFormcreatorForm_Validator::VALIDATION_STATUS_WAITING,
-            ]],
-         ],
-      ]);
-      $filter = $filter->getSQL();
-      $tab[] = [
-         'id'                 => '40',
-         'table'              => Group::getTable(),
-         'field'              => 'completename',
-         'name'               => __('Current form approver group', 'formcreator'),
-         'massiveaction'      => false,
-         'datatype'           => 'dropdown',
-         'forcegroupby'       => true,
-         'joinparams'         => [
-            'jointype'        => 'itemtype_item_revert',
-            'specific_itemtype' => Group::getType(),
-            'beforejoin' => [
-               'table'      => PluginFormcreatorFormanswerValidation::getTable(),
-               'joinparams'    => [
-                  'jointype'   => 'child',
-                  'condition'  => "AND NEWTABLE.level = ($filter)",
-                  'beforejoin' => [
-                     'table'              => PluginFormcreatorFormAnswer::getTable(),
-                     'joinparams'         => [
-                        'jointype'           => 'itemtype_item_revert',
-                        'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
-                     ],
-                  ],
-               ],
-            ],
-         ],
-      ];
-
-      // This search option is identical to 'Form approver'
-      // With a filter limiting to the levels waiting for validation
-      $newtab = [
-         'id'                 => '41',
-         'table'              => User::getTable(),
-         'field'              => 'name',
-         'name'               => __('Current form approver', 'formcreator'),
-         'massiveaction'      => false,
-         'datatype'           => 'dropdown',
-         'forcegroupby'       => true,
-         'joinparams'         => [
-            'jointype'        => 'itemtype_item_revert',
-            'specific_itemtype' => User::getType(),
-            'beforejoin' => [
-               'table'      => PluginFormcreatorFormanswerValidation::getTable(),
-               'joinparams'    => [
-                  'jointype'   => 'child',
-                  'condition'  => "AND NEWTABLE.level = ($filter)",
-                  'beforejoin' => [
-                     'table'              => PluginFormcreatorFormAnswer::getTable(),
-                     'joinparams'         => [
-                        'jointype'           => 'itemtype_item_revert',
-                        'specific_itemtype'  => PluginFormcreatorFormAnswer::class,
-                     ],
-                  ],
-               ],
-            ],
-         ],
-      ];
-      if (!Session::isCron() // no filter for cron
-          && Session::getCurrentInterface() == 'helpdesk') {
-         $newtab['right']       = 'id';
-      }
-
-      $tab[] = $newtab;
 
       $tab[] = [
          'id'                 => '42',
@@ -1375,6 +998,15 @@ class PluginFormcreatorIssue extends CommonDBTM {
          ],
       ];
 
+      $tab[] = [
+         'id'                 => '254',
+         'table'              => self::getTable(),
+         'field'              => 'items_id',
+         'name'               => __('Ticket'),
+         'datatype'           => 'string',
+         'massiveaction'      => false
+      ];
+
       return $tab;
    }
 
@@ -1425,7 +1057,7 @@ class PluginFormcreatorIssue extends CommonDBTM {
    }
 
    public static function giveItem($itemtype, $option_id, $data, $num) {
-      $searchopt = Search::getOptions($itemtype);
+      $searchopt = &Search::getOptions($itemtype);
       $table = $searchopt[$option_id]["table"];
       $field = $searchopt[$option_id]["field"];
 
@@ -1452,7 +1084,7 @@ class PluginFormcreatorIssue extends CommonDBTM {
                   break;
 
                case PluginFormcreatorFormAnswer::class:
-                  $formAnswer = new PluginFormcreatorFormAnswer();
+                  $formAnswer = PluginFormcreatorCommon::getFormAnswer();
                   if (!$formAnswer->getFromDB($id)) {
                      trigger_error(sprintf("Formanswer ID %s not found", $id), E_USER_WARNING);
                      break;
@@ -1699,6 +1331,7 @@ class PluginFormcreatorIssue extends CommonDBTM {
          PluginFormcreatorIssue::class,
          $searchCriteria
       );
+
       $count = 0;
       if (isset($searchWaiting['data']['totalcount'])) {
          $count = $searchWaiting['data']['totalcount'];

@@ -239,6 +239,20 @@ PluginFormcreatorTranslatableInterface
       ) + 1;
       $newSectionId = static::import($linker, $export, $this->fields[$formFk]);
 
+      // Before importing the section, we need to give to the linker the questions
+      // used in the conditions of the section being duplicated
+      $conditions = (new PluginFormcreatorCondition())->find([
+         'itemtype' => self::getType(),
+         'items_id' => $this->getID()
+      ]);
+      foreach ($conditions as $row) {
+         $question = PluginFormcreatorQuestion::getById($row['plugin_formcreator_questions_id']);
+         if ($question === null || $question === false) {
+            continue;
+         }
+         $linker->addObject($row['plugin_formcreator_questions_id'], $question);
+      }
+
       if ($newSectionId === false) {
          return false;
       }
@@ -431,11 +445,12 @@ PluginFormcreatorTranslatableInterface
    /**
     * gets all sections in a form
     * @param int $formId ID of a form
-    * @return \Generator Generator of sections in a form
+    * @return self[] sections in a form
     */
-   public static function getSectionsFromForm($formId): \Generator {
+   public static function getSectionsFromForm($formId) {
       global $DB;
 
+      $sections = [];
       $rows = $DB->request([
          'SELECT' => ['id'],
          'FROM'   => self::getTable(),
@@ -447,8 +462,10 @@ PluginFormcreatorTranslatableInterface
       foreach ($rows as $row) {
          $section = new self();
          $section->getFromDB($row['id']);
-         yield $row['id'] => $section;
+         $sections[$row['id']] = $section;
       }
+
+      return $sections;
    }
 
    public function showForm($ID, $options = []) {
@@ -530,7 +547,7 @@ PluginFormcreatorTranslatableInterface
 
       $strings = $this->getMyTranslatableStrings($options);
 
-      foreach (PluginFormcreatorQuestion::getQuestionsFromSection($this->getID()) as $question) {
+      foreach ((new PluginFormcreatorQuestion())->getQuestionsFromSection($this->getID()) as $question) {
          foreach ($question->getTranslatableStrings($options) as $type => $subStrings) {
             $strings[$type] = array_merge($strings[$type], $subStrings);
          }
@@ -549,7 +566,7 @@ PluginFormcreatorTranslatableInterface
       ]);
       $formId = $this->fields[PluginFormcreatorForm::getForeignKeyField()];
       $onclick = 'plugin_formcreator.showSectionForm(' . $formId . ', ' . $sectionId . ');';
-      $html = '<a href="#" onclick=' . $onclick . '" data-field="name">';
+      $html = '<a href="#" onclick="' . $onclick . '" data-field="name">';
       $html .= "<sup class='plugin_formcreator_conditions_count' title='" . __('Count of conditions', 'formcreator') ."'>$nb</sup>";
       $html .= '<span>';
       $html .= empty($this->fields['name']) ? '(' . $sectionId . ')' : $this->fields['name'];

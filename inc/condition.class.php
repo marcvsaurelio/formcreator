@@ -65,6 +65,7 @@ class PluginFormcreatorCondition extends CommonDBChild implements PluginFormcrea
       return _n('Condition', 'Conditions', $nb, 'formcreator');
    }
 
+
    public function prepareInputForAdd($input) {
       // generate a unique id
       if (!isset($input['uuid'])
@@ -305,14 +306,13 @@ class PluginFormcreatorCondition extends CommonDBChild implements PluginFormcrea
       /** @var CommonDBTM $item */
       if ($item instanceof PluginFormcreatorForm) {
          return [];
-      }
-      if ($item instanceof PluginFormcreatorSection) {
+      } else if ($item instanceof PluginFormcreatorSection) {
          if ($item->isNewItem()) {
             $formFk = PluginFormcreatorForm::getForeignKeyField();
-            $sectionsGenerator = PluginFormcreatorSection::getSectionsFromForm($item->fields[$formFk]);
+            $sections = (new PluginFormcreatorSection())->getSectionsFromForm($item->fields[$formFk]);
             $sectionsList = [];
-            foreach ($sectionsGenerator as $sectionId => $section) {
-               $sectionsList[] = $sectionId;
+            foreach ($sections as $section) {
+               $sectionsList[] = $section->getID();
             }
             $questionListExclusion = [];
             if (count($sectionsList) > 0) {
@@ -326,11 +326,10 @@ class PluginFormcreatorCondition extends CommonDBChild implements PluginFormcrea
          return [PluginFormcreatorQuestion::getTable() . '.' . $sectionFk => ['<>', $item->getID()]];
       } else if ($item instanceof PluginFormcreatorQuestion) {
          if (!$item->isNewItem()) {
-            return [PluginFormcreatorQuestion::getTableField('id') => ['<>', $item->getID()]];
+            return [PluginFormcreatorQuestion::getTable() . '.id' => ['<>', $item->getID()]];
          }
          return [];
       }
-
       if (in_array($item::getType(), PluginFormcreatorForm::getTargetTypes())) {
          // No question exclusion for targets
          return [];

@@ -79,6 +79,8 @@ abstract class PluginFormcreatorAbstractTarget extends CommonDBChild implements
     */
    abstract protected function getTaggableFields();
 
+   abstract protected function getTemplateItemtypeName();
+
    const DESTINATION_ENTITY_CURRENT = 1;
    const DESTINATION_ENTITY_REQUESTER = 2;
    const DESTINATION_ENTITY_REQUESTER_DYN_FIRST = 3;
@@ -129,7 +131,7 @@ abstract class PluginFormcreatorAbstractTarget extends CommonDBChild implements
          Session::addMessageAfterRedirect(__('A target must be associated to a form.', 'formcreator'));
          return false;
       }
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       if (!$form->getFromDB((int) $input[$formFk])) {
          Session::addMessageAfterRedirect(__('A target must be associated to an existing form.', 'formcreator'), false, ERROR);
          return false;
@@ -274,14 +276,15 @@ abstract class PluginFormcreatorAbstractTarget extends CommonDBChild implements
     * @return array all fields of the object wih converted template fields
     */
    protected function convertTags($input) {
-      $questionsGenerator = PluginFormcreatorQuestion::getQuestionsFromForm($this->getForm()->getID());
+      $question = new PluginFormcreatorQuestion();
+      $questions = $question->getQuestionsFromForm($this->getForm()->getID());
 
       $taggableFields = $this->getTaggableFields();
 
       // Prepare array of search / replace
       $ids = [];
       $uuids = [];
-      foreach ($questionsGenerator as $question) {
+      foreach ($questions as $question) {
          $id      = $question->fields['id'];
          $uuid    = $question->fields['uuid'];
          $ids[]   = "##question_$id##";
@@ -364,7 +367,7 @@ abstract class PluginFormcreatorAbstractTarget extends CommonDBChild implements
     */
    public function getForm() {
       if ($this->form === null) {
-         $form = new PluginFormcreatorForm();
+         $form = PluginFormcreatorCommon::getForm();
          if (!$form->getFromDB($this->fields[PluginFormcreatorForm::getForeignKeyField()])) {
             return null;
          }
@@ -559,5 +562,19 @@ abstract class PluginFormcreatorAbstractTarget extends CommonDBChild implements
    public function prepareInputForClone($input) {
       unset($input['uuid']);
       return $input;
+   }
+
+   protected static function getTemplateByName(string $name): int {
+      $targetTemplateType = (new static())->getTemplateItemtypeName();
+      $targetTemplate = new $targetTemplateType();
+      $targetTemplate->getFromDBByCrit([
+         'name' => $name,
+      ]);
+
+      if ($targetTemplate->isNewItem()) {
+         return 0;
+      }
+
+      return $targetTemplate->getID();
    }
 }

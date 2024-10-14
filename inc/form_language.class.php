@@ -39,7 +39,7 @@ implements PluginFormcreatorExportableInterface
    static public $itemtype = PluginFormcreatorForm::class;
    static public $items_id = 'plugin_formcreator_forms_id';
 
-   static $rightname = 'plugin_formcreator_form';
+   static $rightname = 'entity';
 
    /**
     * Returns the type name with consideration of plural
@@ -189,7 +189,7 @@ implements PluginFormcreatorExportableInterface
    public function massDeleteTranslations($post) {
       global $TRANSLATE;
 
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       if (!$form->getFromDB($this->fields['plugin_formcreator_forms_id'])) {
          return;
       }
@@ -214,7 +214,7 @@ implements PluginFormcreatorExportableInterface
          if (!$this->getFromDB($ID)) {
             return false;
          }
-         $item = new PluginFormcreatorForm();
+         $item = PluginFormcreatorCommon::getForm();
          $item->getFromDB($this->fields[PluginFormcreatorForm::getForeignKeyField()]);
       } else {
          $this->getEmpty();
@@ -261,7 +261,7 @@ implements PluginFormcreatorExportableInterface
    }
 
    public function showNewTranslation($options = []) {
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $form->getFromDB($this->fields[PluginFormcreatorForm::getForeignKeyField()]);
 
       echo '<div data-itemtype="PluginFormcreatorForm_Language" data-id="' . $this->getID() . '">';
@@ -320,7 +320,7 @@ implements PluginFormcreatorExportableInterface
    }
 
    public function showTranslations($options = []) {
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $form->getFromDB($this->fields[PluginFormcreatorForm::getForeignKeyField()]);
       $this->showFormHeader($options);
       $this->initForm($this->getID());
@@ -571,7 +571,7 @@ implements PluginFormcreatorExportableInterface
       // add the form language to the linker
       $linker->addObject($originalId, $item);
 
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $form->getFromDB($input[$formFk]);
       $translations = $input['_strings'] ?? [];
       $form->setTranslations($input['name'], $translations);
@@ -597,7 +597,7 @@ implements PluginFormcreatorExportableInterface
       }
       unset($export[$idToRemove]);
 
-      $form = new PluginFormcreatorForm();
+      $form = PluginFormcreatorCommon::getForm();
       $form->getFromDB($this->fields[$formFk]);
       $export['_strings'] = $form->getTranslations($this->fields['name']);
 

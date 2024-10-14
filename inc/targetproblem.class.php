@@ -63,7 +63,7 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
       return Problem::class;
    }
 
-   protected static function getTemplateItemtypeName(): string {
+   protected function getTemplateItemtypeName(): string {
       return ProblemTemplate::class;
    }
 
@@ -199,13 +199,26 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
 
       $this->prepareActors($form, $formanswer);
 
-      $data = $this->setTargetRequesters($data, $formanswer);
-      $data = $this->setTargetEntity($data, $formanswer, $this->firstRequester);
+      if (count($this->requesters['_users_id_requester']) == 0) {
+         $this->addActor(PluginFormcreatorTarget_Actor::ACTOR_ROLE_REQUESTER, $formanswer->fields['requester_id'], true);
+         $requesters_id = $formanswer->fields['requester_id'];
+      } else {
+         $requesterAccounts = array_filter($this->requesters['_users_id_requester'], function($v) {
+            return ($v != 0);
+         });
+         $requesters_id = array_shift($requesterAccounts);
+         if ($requesters_id === null) {
+            // No account for requesters, then fallback on the account used to fill the answers
+            $requesters_id = $formanswer->fields['requester_id'];
+         }
+      }
+
+      $data = $this->setTargetEntity($data, $formanswer, $requesters_id);
       $data = $this->setTargetUrgency($data, $formanswer);
       $data = $this->setTargetPriority($data, $formanswer);
-      $data = $this->setTargetObservers($data, $formanswer);
-      $data = $this->setTargeAssigned($data, $formanswer);
-      $data = $this->setTargetSuppliers($data, $formanswer);
+
+      $data = $this->requesters + $this->observers + $this->assigned + $this->assignedSuppliers + $data;
+      $data = $this->requesterGroups + $this->observerGroups + $this->assignedGroups + $data;
 
       $data = $this->prepareUploadedFiles($data, $formanswer);
 
@@ -219,8 +232,6 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
          return null;
       }
 
-      $this->saveTags($formanswer, $problemID);
-
       // Add link between Problem and FormAnswer
       $itemlink = $this->getItem_Item();
       $itemlink->add([
@@ -228,6 +239,8 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
          'items_id'     => $formanswer->fields['id'],
          'problems_id'  => $problemID,
       ]);
+
+      $this->saveTags($formanswer, $problemID);
 
       return $problem;
    }
@@ -295,7 +308,8 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
             }
          }
 
-         if (Plugin::isPluginActive('tag')) {
+         $plugin = new Plugin();
+         if ($plugin->isInstalled('tag') && $plugin->isActivated('tag')) {
             $input['tag_questions'] = (!empty($input['_tag_questions']))
                                        ? implode(',', $input['_tag_questions'])
                                        : '';
@@ -336,7 +350,7 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
    protected function getTargetTemplate(array $data): int {
       global $DB;
 
-      $targetItemtype = static::getTemplateItemtypeName();
+      $targetItemtype = $this->getTemplateItemtypeName();
       $targetTemplateFk = $targetItemtype::getForeignKeyField();
       if ($targetItemtype::isNewID($this->fields[$targetTemplateFk]) && !ITILCategory::isNewID($data['itilcategories_id'])) {
          $rows = $DB->request([
@@ -511,6 +525,15 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
          $input[$fieldSetting['field']] = $question->getID();
       }
 
+      // Find template by name
+      $input['problemtemplates_id'] = 0;
+      if (is_string($input['_problemtemplate']) && strlen($input['_problemtemplate']) > 0) {
+         $input['problemtemplates_id'] = self::getTemplateByName($input['_problemtemplate']);
+         if ($input['problemtemplates_id'] === 0) {
+            $typeName = strtolower(self::getTypeName());
+            throw new ImportFailureException(sprintf(__('Failed to add or update the %1$s %2$s: It uses a non existent template', 'formceator'), $typeName, $input['name']));
+         }
+      }
       // Add or update
       $originalId = $input[$idKey];
       $item->skipChecks = true;
@@ -566,7 +589,7 @@ class PluginFormcreatorTargetProblem extends PluginFormcreatorAbstractItilTarget
                2 => __('Actors', 'formcreator'),
                3 => PluginFormcreatorCondition::getTypeName(1),
             ];
-            // if (Plugin::isPluginActive('fields')) {
+            // if ((new Plugin)->isActivated('fields')) {
             //    $tab[4] = __('Fields plugin', 'formcreator');
             // }
             return $tab;

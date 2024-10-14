@@ -45,9 +45,6 @@ PluginFormcreatorTranslatableInterface
    /** @var array $requesters requester actors of the target */
    protected $requesters;
 
-   /** @var array $requesters requester actors of the target */
-   protected $firstRequester;
-
    /** @var array $observers watcher actors of the target */
    protected $observers;
 
@@ -108,7 +105,7 @@ PluginFormcreatorTranslatableInterface
     *
     * @return string
     */
-   abstract static protected function getTemplateItemtypeName(): string;
+   abstract protected function getTemplateItemtypeName(): string;
 
    /**
     * Get the class name of the target itemtype's template predefined field class
@@ -163,11 +160,6 @@ PluginFormcreatorTranslatableInterface
    const LOCATION_RULE_ANSWER = 3;
    const LOCATION_RULE_LAST_ANSWER  = 4;
 
-   const CONTRACT_RULE_NONE = 1;
-   const CONTRACT_RULE_SPECIFIC = 2;
-   const CONTRACT_RULE_ANSWER = 3;
-   const CONTRACT_RULE_LAST_ANSWER  = 4;
-
    const COMMONITIL_VALIDATION_RULE_NONE = 1;
    const COMMONITIL_VALIDATION_RULE_SPECIFIC_USER_OR_GROUP = 2;
    const COMMONITIL_VALIDATION_RULE_ANSWER_USER = 3;
@@ -193,10 +185,9 @@ PluginFormcreatorTranslatableInterface
 
    public static function getEnumDueDateRule() {
       return [
-         self::DUE_DATE_RULE_NONE   => __('TTR from template or none', 'formcreator'),
          self::DUE_DATE_RULE_ANSWER => __('equals to the answer to the question', 'formcreator'),
          self::DUE_DATE_RULE_TICKET => __('calculated from the ticket creation date', 'formcreator'),
-         self::DUE_DATE_RULE_CALC   => __('calculated from the answer to the question', 'formcreator'),
+         self::DUE_DATE_RULE_CALC => __('calculated from the answer to the question', 'formcreator'),
       ];
    }
 
@@ -239,15 +230,6 @@ PluginFormcreatorTranslatableInterface
          self::LOCATION_RULE_SPECIFIC     => __('Specific location', 'formcreator'),
          self::LOCATION_RULE_ANSWER       => __('Equals to the answer to the question', 'formcreator'),
          self::LOCATION_RULE_LAST_ANSWER  => __('Last valid answer', 'formcreator'),
-      ];
-   }
-
-   public static function getEnumContractRule() {
-      return [
-         self::CONTRACT_RULE_NONE         => __('Contract from template or none', 'formcreator'),
-         self::CONTRACT_RULE_SPECIFIC     => __('Specific contract', 'formcreator'),
-         self::CONTRACT_RULE_ANSWER       => __('Equals to the answer to the question', 'formcreator'),
-         self::CONTRACT_RULE_LAST_ANSWER  => __('Last valid answer', 'formcreator'),
       ];
    }
 
@@ -771,7 +753,7 @@ PluginFormcreatorTranslatableInterface
    }
 
    protected function showTemplateSettings() {
-      $templateType = static::getTemplateItemtypeName();
+      $templateType = $this->getTemplateItemtypeName();
       $templateFk = $templateType::getForeignKeyField();
 
       echo '<td width="15%">' . $templateType::getTypeName(1) . '</td>';
@@ -792,18 +774,19 @@ PluginFormcreatorTranslatableInterface
          [
             'value'     => $this->fields['due_date_rule'],
             'on_change' => 'plugin_formcreator_formcreatorChangeDueDate(this.value)',
+            'display_emptychoice' => true
          ]
       );
 
       $questionTable = PluginFormcreatorQuestion::getTable();
-      $questionsGenerator = PluginFormcreatorQuestion::getQuestionsFromForm(
+      $questions = (new PluginFormcreatorQuestion)->getQuestionsFromForm(
          $this->getForm()->getID(),
          [
             "$questionTable.fieldtype" => ['date', 'datetime'],
          ]
       );
       $questions_list = [];
-      foreach ($questionsGenerator as $question) {
+      foreach ($questions as $question) {
          $questions_list[$question->getID()] = $question->fields['name'];
       }
       // List questions
@@ -1075,7 +1058,8 @@ PluginFormcreatorTranslatableInterface
    protected function showPluginTagsSettings($rand) {
       global $DB;
 
-      if (Plugin::isPluginActive('tag')) {
+      $plugin = new Plugin();
+      if ($plugin->isInstalled('tag') && $plugin->isActivated('tag')) {
          echo '<tr>';
          echo '<td width="15%">' . __('Ticket tags', 'formcreator') . '</td>';
          echo '<td width="25%">';
@@ -1307,46 +1291,6 @@ SCRIPT;
       echo '</tr>';
    }
 
-   protected function showContractSettings($rand) {
-      echo '<tr>';
-      echo '<td width="15%">' . __('Contract') . '</td>';
-      echo '<td width="45%">';
-      Dropdown::showFromArray('contract_rule', static::getEnumContractRule(), [
-         'value'                 => $this->fields['contract_rule'],
-         'on_change'             => "plugin_formcreator_change_contract($rand)",
-         'rand'                  => $rand
-      ]);
-
-      echo Html::scriptBlock("plugin_formcreator_change_contract($rand)");
-      echo '</td>';
-      echo '<td width="15%">';
-      echo '<span id="contract_question_title" style="display: none">' . PluginFormcreatorQuestion::getTypeName(1) . '</span>';
-      echo '<span id="contract_specific_title" style="display: none">' . __('Contract ', 'formcreator') . '</span>';
-      echo '</td>';
-      echo '<td width="25%">';
-
-      echo '<div id="contract_specific_value" style="display: none">';
-      Contract::dropdown([
-         'name' => '_contract_specific',
-         'value' => $this->fields["contract_question"],
-      ]);
-      echo '</div>';
-      echo '<div id="contract_question_value" style="display: none">';
-      PluginFormcreatorQuestion::dropdownForForm(
-         $this->getForm(),
-         [
-            'fieldtype' => ['glpiselect'],
-            'itemtype' => Contract::class
-         ],
-         'contract_question',
-         $this->fields['contract_question']
-      );
-
-      echo '</div>';
-      echo '</td>';
-      echo '</tr>';
-   }
-
    protected function showValidationSettings($rand) {
       echo '<tr>';
 
@@ -1445,10 +1389,10 @@ SCRIPT;
    protected function setTargetDueDate($data, PluginFormcreatorFormAnswer $formanswer) {
       global $DB;
 
-      $date = null;
+      $answer  = new PluginFormcreatorAnswer();
       if ($this->fields['due_date_question'] != 0) {
          $request = [
-            'FROM' => PluginFormcreatorAnswer::getTable(),
+            'FROM' => $answer::getTable(),
             'WHERE' => [
                'AND' => [
                   $formanswer::getForeignKeyField() => $formanswer->fields['id'],
@@ -1458,9 +1402,11 @@ SCRIPT;
          ];
          $iterator = $DB->request($request);
          if ($iterator->count() > 0) {
-            $iterator->rewind(); // TODO: drop when GLPI 10.1 is out (back compatibility with GLPI 9.5)
-            $date = $iterator->current();
+            $iterator->rewind();
+            $date   = $iterator->current();
          }
+      } else {
+         $date = null;
       }
 
       $period = '';
@@ -1480,7 +1426,6 @@ SCRIPT;
       }
       $str    = "+" . $this->fields['due_date_value'] . " $period";
 
-      $due_date = null;
       switch ($this->fields['due_date_rule']) {
          case self::DUE_DATE_RULE_ANSWER:
             $due_date = $date['answer'];
@@ -1490,6 +1435,9 @@ SCRIPT;
             break;
          case self::DUE_DATE_RULE_CALC:
             $due_date = date('Y-m-d H:i:s', strtotime($date['answer'] . " " . $str));
+            break;
+         default:
+            $due_date = null;
             break;
       }
       if (!is_null($due_date)) {
@@ -1734,7 +1682,8 @@ SCRIPT;
       global $DB;
 
       // Add tag if presents
-      if (!Plugin::isPluginActive('tag')) {
+      $plugin = new Plugin();
+      if (!$plugin->isActivated('tag')) {
          return;
       }
 
@@ -2335,17 +2284,13 @@ SCRIPT;
       $targetTemplateFk = $targetItemtype::getForeignKeyField();
 
       $data = $targetItemtype::getDefaultValues();
-      // Determine category early, because it is used to determine the template
-      $data = $this->setTargetCategory($data, $formanswer);
 
       $this->fields[$targetTemplateFk] = $this->getTargetTemplate($data);
-      $templateItemtype = static::getTemplateItemtypeName();
-      /** @var CommonITILTemplate $template */
-      $template = new $templateItemtype();
-      $template->getFromDBWithData($this->fields[$targetTemplateFk]);
 
       // Get predefined Fields
-      $predefined_fields       = $template->predefined;
+      $predefinedFieldItemtype = $this->getTemplatePredefinedFieldItemtype();
+      $templatePredeinedField  = new $predefinedFieldItemtype();
+      $predefined_fields       = $templatePredeinedField->getPredefinedFields($this->fields[$targetTemplateFk], true);
 
       if (isset($predefined_fields['_users_id_requester'])) {
          $this->addActor(PluginFormcreatorTarget_Actor::ACTOR_ROLE_REQUESTER, $predefined_fields['_users_id_requester'], true);
@@ -2379,6 +2324,8 @@ SCRIPT;
       }
 
       $data = array_merge($data, $predefined_fields);
+
+      $data = $this->setTargetCategory($data, $formanswer);
 
       if (($data['requesttypes_id'] ?? 0) == 0) {
          unset($data['requesttypes_id']);
@@ -2423,6 +2370,29 @@ SCRIPT;
                }
             }
          }
+      }
+
+      return $data;
+   }
+
+   /**
+    * Undocumented function
+    *
+    * @param array $data
+    * @param PluginFormcreatorFormAnswer $formanswer
+    * @return array
+    */
+   protected function setDocuments($data, PluginFormcreatorFormAnswer $formanswer): array {
+      foreach ($formanswer->getQuestionFields($formanswer->getForm()->getID()) ?? [] as $field) {
+         $question = $field->getQuestion();
+         if ($question->fields['fieldtype'] !== 'glpiselect') {
+            continue;
+         }
+         if ($question->fields['itemtype'] !== Document::class) {
+            continue;
+         }
+
+         $data['_documents_id'][] = $field->getRawValue();
       }
 
       return $data;
@@ -2550,98 +2520,6 @@ SCRIPT;
 
    public static function getNoMailImage() {
       return '<i class="fas fa-envelope pointer" title="' . __('Email followup') . ' ' . __('No') . '" width="20"></i>';
-   }
-
-   /**
-    * Undocumented function
-    *
-    * @param array $data
-    * @param PluginFormcreatorFormAnswer $formanswer
-    * @return array
-    */
-   protected function setTargetRequesters(array $data, PluginFormcreatorFormAnswer $formanswer): array {
-      if (count($this->requesters['_users_id_requester']) == 0) {
-         $this->addActor(PluginFormcreatorTarget_Actor::ACTOR_ROLE_REQUESTER, $formanswer->fields['requester_id'], true);
-         $requesters_id = $formanswer->fields['requester_id'];
-      } else {
-         $requesterAccounts = array_filter($this->requesters['_users_id_requester'], function($v) {
-            return ($v != 0);
-         });
-         $requesters_id = array_shift($requesterAccounts);
-         if ($requesters_id === null) {
-            // No account for requesters, then fallback on the account used to fill the answers
-            $requesters_id = $formanswer->fields['requester_id'];
-         }
-
-         // If only one requester, revert array of requesters into a scalar
-         // This is needed to process business rule affecting location of a ticket with the location of the user
-         if (count($this->requesters['_users_id_requester']) == 1) {
-            $this->requesters['_users_id_requester'] = array_pop($this->requesters['_users_id_requester']);
-         }
-      }
-
-      // There is always at least one requester
-      $data = $this->requesters + $data;
-      $this->firstRequester = $requesters_id;
-
-      if (count($this->requesterGroups['_groups_id_requester']) > 0) {
-         $data = $this->requesterGroups + $data;
-      }
-
-      return $data;
-   }
-
-   /**
-    * Undocumented function
-    *
-    * @param array $data
-    * @param PluginFormcreatorFormAnswer $formanswer
-    * @return array
-    */
-   protected function setTargetObservers(array $data, PluginFormcreatorFormAnswer $formanswer): array {
-      if (count($this->observers['_users_id_observer']) > 0) {
-         $data = $this->observers + $data;
-      }
-
-      if (count($this->observerGroups['_groups_id_observer']) > 0) {
-         $data = $this->observerGroups + $data;
-      }
-
-      return $data;
-   }
-
-   /**
-    * Undocumented function
-    *
-    * @param array $data
-    * @param PluginFormcreatorFormAnswer $formanswer
-    * @return array
-    */
-   protected function setTargeAssigned(array $data, PluginFormcreatorFormAnswer $formanswer): array {
-      if (count($this->assigned['_users_id_assign']) > 0) {
-         $data = $this->assigned + $data;
-      }
-
-      if (count($this->assignedGroups['_groups_id_assign']) > 0) {
-         $data = $this->assignedGroups + $data;
-      }
-
-      return $data;
-   }
-
-   /**
-    * Undocumented function
-    *
-    * @param array $data
-    * @param PluginFormcreatorFormAnswer $formanswer
-    * @return array
-    */
-   protected function setTargetSuppliers(array $data, PluginFormcreatorFormAnswer $formanswer): array {
-      if (count($this->assignedSuppliers['_suppliers_id_assign']) > 0) {
-         $data = $this->assignedSuppliers + $data;
-      }
-
-      return $data;
    }
 
    public function getCloneRelations(): array {

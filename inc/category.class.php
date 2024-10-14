@@ -64,14 +64,6 @@ class PluginFormcreatorCategory extends CommonTreeDropdown
       $item->showChildren();
    }
 
-   public function displaySpecificTypeField($ID, $field = [], array $options = []) {
-      if ($field['name'] == 'icon') {
-         PluginFormcreatorCommon::showFontAwesomeDropdown($field['name'], [
-            'value' => $this->fields[$field['name']],
-         ]);
-      }
-   }
-
    public function getAdditionalFields() {
       return [
          [
@@ -87,21 +79,18 @@ class PluginFormcreatorCategory extends CommonTreeDropdown
             'list'      => false
          ],
          [
-            'name'      => 'icon',
-            'type'      => 'fontawesome-icon',
-            'label'     => __('Icon', 'formcreator'),
+            'name'      => 'is_display',
+            'type'      => 'bool',
+            'label'     => sprintf(
+                  __('Show %1$s'),
+                  __('Imagem', 'glpi')
+            ),
             'list'      => false
          ],
          [
-            'name'      => 'icon_color',
-            'type'      => 'color',
-            'label'     => __('Icon color', 'formcreator'),
-            'list'      => false
-         ],
-         [
-            'name'      => 'background_color',
-            'type'      => 'color',
-            'label'     => __('Background color', 'formcreator'),
+            'name'      => 'url_image',
+            'type'      => 'text',
+            'label'     => __('Path', 'glpi') . ' ' . __('Imagem', 'glpi'),
             'list'      => false
          ],
       ];
@@ -117,7 +106,6 @@ class PluginFormcreatorCategory extends CommonTreeDropdown
 
       $cat_table  = PluginFormcreatorCategory::getTable();
       $form_table = PluginFormcreatorForm::getTable();
-      $knowbaseitems_knowbaseitemcategories_table = KnowbaseItem_KnowbaseItemCategory::getTable();
 
       if (version_compare(GLPI_VERSION, '10.0.6') > 0) {
          $knowbase_category = KnowbaseItemCategory::SEEALL;
@@ -149,29 +137,61 @@ class PluginFormcreatorCategory extends CommonTreeDropdown
       $count1 = new QuerySubQuery($count_forms_criteria);
       $count2 = new QuerySubQuery([
          'COUNT' => 'count',
-         'FROM' => $knowbaseitems_knowbaseitemcategories_table,
+         'FROM' => 'glpi_knowbaseitems_knowbaseitemcategories',
          'WHERE' => [
             'knowbaseitems_id' => new QuerySubQuery($query_faqs),
-            [(new QueryExpression("`$knowbaseitems_knowbaseitemcategories_table`.`knowbaseitemcategories_id` = `$cat_table`.`knowbaseitemcategories_id`"))],
+            [(new QueryExpression("`glpi_knowbaseitems_knowbaseitemcategories`.`knowbaseitemcategories_id` = `$cat_table`.`knowbaseitemcategories_id`"))],
          ]
       ]);
       $request = [
          'SELECT' => [
-            'id',
-            'name',
-            'icon',
-            'icon_color',
-            'background_color',
-            'comment',
+            self::getTableField('id'),
             "$categoryFk as parent",
             'level',
             new QueryExpression(
                $count1->getQuery() . " + " . $count2->getQuery() . " as items_count"
             ),
+            'is_display',
+            'url_image',
          ],
          'FROM' => $cat_table,
+         'LEFT JOIN' => [],
          'ORDER' => ["level DESC", "name DESC"],
       ];
+      $translation_table = DropdownTranslation::getTable();
+      if (Session::haveTranslations(self::getType(), 'name')) {
+         $request['LEFT JOIN']["$translation_table as namet"] = [
+            'FKEY' => [
+               $cat_table => 'id',
+               'namet' => 'items_id',
+               ['AND' => [
+                  'namet.language' => $_SESSION['glpilanguage'],
+                  'namet.itemtype' => self::getType(),
+                  'namet.field' => 'name',
+               ]],
+            ],
+         ];
+         $request['SELECT'][] = 'namet.value as name';
+      } else {
+         $request['SELECT'][] = 'name';
+         $request['SELECT'][] = 'comment';
+      }
+      if (Session::haveTranslations(self::getType(), 'comment')) {
+         $request['LEFT JOIN']["$translation_table as commentt"] = [
+            'FKEY' => [
+               $cat_table => 'id',
+               'commentt' => 'items_id',
+               ['AND' => [
+                  'namet.language' => $_SESSION['glpilanguage'],
+                  'namet.itemtype' => self::getType(),
+                  'namet.field' => 'comment',
+               ]],
+            ],
+         ];
+         $request['SELECT'][] = 'commentt.value as comment';
+      } else {
+         $request['SELECT'][] = 'comment';
+      }
       $result = $DB->request($request);
 
       $categories = [];

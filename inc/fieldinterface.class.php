@@ -257,13 +257,6 @@ interface PluginFormcreatorFieldInterface
    public function isPublicFormCompatible(): bool;
 
    /**
-    * Is the field rendered in a target ?
-    *
-    * @return boolean true if the field must be rendered
-    */
-   public function isRenderedInTarget(): bool;
-
-   /**
     * Gets HTML code for the icon of a field
     */
    public function getHtmlIcon();
@@ -319,23 +312,5 @@ interface PluginFormcreatorFieldInterface
     */
    public function setFormAnswer(PluginFormcreatorFormAnswer $form_answer): void;
 
-   /**
-    * define additional tab names to design the question
-    *
-    * @param array $tabs
-    * @return void
-    */
-   public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0): array;
-
-   public function displayTabContentForItem(CommonGLPI $item, string $tabnum): bool;
-
    public function getRawValue();
-
-   /*
-    * Get all tags availabie for targets of the form
-    *
-    * @param string $search Search string to filter tags
-    * @return array
-    */
-   public function getTags(string $search = ''): array;
 }
