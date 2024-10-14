@@ -65,7 +65,6 @@ class FileField extends PluginFormcreatorAbstractField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -198,6 +197,21 @@ class FileField extends PluginFormcreatorAbstractField
 
    public static function canRequire(): bool {
       return true;
+   }
+
+   public function saveUploads($input) {
+      $key = 'formcreator_field_' . $this->question->getID();
+      $index = 0;
+      $answer_value = [];
+      foreach ($input["_$key"] as $document) {
+         $document = Toolbox::stripslashes_deep($document);
+         if (is_file(GLPI_TMP_DIR . '/' . $document)) {
+            $prefix = $input['_prefix_' . $key][$index];
+            $answer_value[] = $this->saveDocument($document, $prefix);
+         }
+         $index++;
+      }
+      $this->uploadData = $answer_value;
    }
 
    public function hasInput($input): bool {

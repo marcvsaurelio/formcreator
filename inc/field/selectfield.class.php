@@ -54,7 +54,6 @@ class SelectField extends RadiosField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -74,7 +73,7 @@ class SelectField extends RadiosField
          foreach ($values as $value) {
             if ((trim($value) != '')) {
                $unsanitized = Sanitizer::unsanitize(__($value, $domain));
-               $translatedValues[$unsanitized] = $unsanitized;
+               $translatedValues[$value] = $unsanitized;
             }
          }
 

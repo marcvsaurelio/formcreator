@@ -53,7 +53,6 @@ class UrgencyField extends PluginFormcreatorAbstractField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -115,7 +114,7 @@ class UrgencyField extends PluginFormcreatorAbstractField
       return true;
    }
 
-   public function getAvailableValues() {
+   public function getAvailableValues(array $values = null): array {
       return [
          5 => _x('urgency', 'Very high'),
          4 => _x('urgency', 'High'),

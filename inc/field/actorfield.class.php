@@ -76,7 +76,6 @@ class ActorField extends PluginFormcreatorAbstractField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -129,7 +128,7 @@ class ActorField extends PluginFormcreatorAbstractField
          'display_emptychoice' => false,
          'values'          => array_keys($value),
          'valuesnames'     => array_values($value),
-         '_idor_token'     => Session::getNewIDORToken(User::getType()),
+         '_idor_token'     => Session::getNewIDORToken(User::getType(), ['entity_restrict' => -1]),
       ];
       $html .= \PluginFormcreatorCommon::jsAjaxDropdown(
          $fieldName . '[]',

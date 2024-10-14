@@ -59,7 +59,6 @@ class TextareaField extends TextField
          'item' => $this->question,
          'question_params' => $parameters,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -150,14 +149,15 @@ class TextareaField extends TextField
       $id           = $this->question->getID();
       $rand         = mt_rand();
       $fieldName    = 'formcreator_field_' . $id;
-      $value = $this->value;
+      // Translations are saved sanitized, so we need to sanitize initial value and unsanitize translated value
+      $defaultValue = Sanitizer::unsanitize(__(Sanitizer::sanitize($this->value), $domain));
       $html = '';
       $form = PluginFormcreatorForm::getByItem($this->getQuestion());
       $html .= Html::textarea([
          'name'              => $fieldName,
          'editor_id'         => "$fieldName$rand",
          'rand'              => $rand,
-         'value'             => $value,
+         'value'             => $defaultValue,
          'rows'              => 5,
          'display'           => false,
          'enable_richtext'   => true,
@@ -243,7 +243,40 @@ class TextareaField extends TextField
          return false;
       }
 
-      // All is OK
+      return $this->isValidValue($this->value);
+   }
+
+   public function isValidValue($value): bool {
+      if (strlen($value) == 0) {
+         return true;
+      }
+
+      $parameters = $this->getParameters();
+
+      $stripped = strip_tags($value);
+
+      // Check the field matches the format regex
+      $regex = $parameters['regex']->fields['regex'];
+      if ($regex !== null && strlen($regex) > 0) {
+         if (!preg_match($regex, $stripped)) {
+            Session::addMessageAfterRedirect(sprintf(__('Specific format does not match: %s', 'formcreator'), $this->question->fields['name']), false, ERROR);
+            return false;
+         }
+      }
+
+      // Check the field is in the range
+      $rangeMin = $parameters['range']->fields['range_min'];
+      $rangeMax = $parameters['range']->fields['range_max'];
+      if ($rangeMin > 0 && strlen($stripped) < $rangeMin) {
+         Session::addMessageAfterRedirect(sprintf(__('The text is too short (minimum %d characters): %s', 'formcreator'), $rangeMin, $this->question->fields['name']), false, ERROR);
+         return false;
+      }
+
+      if ($rangeMax > 0 && strlen($stripped) > $rangeMax) {
+         Session::addMessageAfterRedirect(sprintf(__('The text is too long (maximum %d characters): %s', 'formcreator'), $rangeMax, $this->question->fields['name']), false, ERROR);
+         return false;
+      }
+
       return true;
    }
 
@@ -261,7 +294,7 @@ class TextareaField extends TextField
          return [];
       }
 
-      $this->value = $input['default_values'] ?? '';
+      $this->value = $input['default_values'];
 
       // Handle uploads
       $key = 'formcreator_field_' . $this->question->getID();
@@ -270,7 +303,7 @@ class TextareaField extends TextField
          $this->uploads['_prefix_' . $key] = $input['_prefix_default_values'];
          $this->uploads['_tag_' . $key] = $input['_tag_default_values'];
       }
-      $input[$key] = $input['default_values'] ?? '';
+      $input[$key] = $input['default_values'];
 
       return $input;
    }

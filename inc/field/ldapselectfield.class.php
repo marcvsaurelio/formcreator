@@ -57,7 +57,6 @@ class LdapselectField extends SelectField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -152,6 +151,7 @@ class LdapselectField extends SelectField
       if (isset($ldap_values['ldap_attribute'])) {
          $ldap_dropdown = RuleRightParameter::getById((int) $ldap_values['ldap_attribute']);
          if (!($ldap_dropdown instanceof RuleRightParameter)) {
+            Session::addMessageAfterRedirect(__('LDAP attribute is required!', 'formcreator'), false, ERROR);
             return [];
          }
       }

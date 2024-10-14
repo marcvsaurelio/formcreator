@@ -33,7 +33,6 @@
 namespace GlpiPlugin\Formcreator\Field;
 
 use Dropdown;
-use Plugin;
 use PluginFormcreatorFormAnswer;
 use PluginTagTag;
 use Session;
@@ -48,13 +47,12 @@ class TagField extends DropdownField
    }
 
    public function showForm(array $options): void {
-      if (!Plugin::isPluginActive('tag')) {
+      if (!\Plugin::isPluginActive('tag')) {
          $options['error'] = __('Warning: Tag plugin is disabled or missing', 'formcreator');
          $template = '@formcreator/field/undefinedfield.html.twig';
          TemplateRenderer::getInstance()->display($template, [
             'item' => $this->question,
             'params' => $options,
-            'no_header' => true,
          ]);
          return;
       }
@@ -65,7 +63,6 @@ class TagField extends DropdownField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -251,10 +248,6 @@ class TagField extends DropdownField
    }
 
    public function isPublicFormCompatible(): bool {
-      return false;
-   }
-
-   public function isRenderedInTarget(): bool {
       return false;
    }
 

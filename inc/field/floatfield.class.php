@@ -59,7 +59,6 @@ class FloatField extends PluginFormcreatorAbstractField
          'item' => $this->question,
          'question_params' => $parameters,
          'params' => $options,
-         'no_header' => true,
       ]);
 
    }
@@ -184,7 +183,7 @@ class FloatField extends PluginFormcreatorAbstractField
    }
 
    public static function getName(): string {
-      return __('Decimal number', 'formcreator');
+      return __('Float', 'formcreator');
    }
 
    public function prepareQuestionInputForSave($input) {
@@ -255,6 +254,7 @@ class FloatField extends PluginFormcreatorAbstractField
          'range' => $range,
       ];
    }
+
 
    public function equals($value): bool {
       return ((float) $this->value) === ((float) $value);

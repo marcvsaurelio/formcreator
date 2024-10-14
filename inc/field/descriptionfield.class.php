@@ -55,7 +55,6 @@ class DescriptionField extends PluginFormcreatorAbstractField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -156,10 +155,6 @@ class DescriptionField extends PluginFormcreatorAbstractField
 
    public function isPublicFormCompatible(): bool {
       return true;
-   }
-
-   public function isRenderedInTarget(): bool {
-      return false;
    }
 
    public function getHtmlIcon() {

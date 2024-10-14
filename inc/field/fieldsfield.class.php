@@ -73,7 +73,7 @@ class FieldsField extends PluginFormcreatorAbstractField
    }
 
    public function isPrerequisites(): bool {
-      return Plugin::isPluginActive('fields');
+      return (new Plugin())->isActivated('fields');
    }
 
    public static function getFieldsFromBlock($block_id): array {
@@ -150,13 +150,12 @@ class FieldsField extends PluginFormcreatorAbstractField
    }
 
    public function showForm(array $options): void {
-      if (!Plugin::isPluginActive('fields')) {
+      if (!\Plugin::isPluginActive('fields')) {
          $options['error'] = __('Warning: Additional Fields plugin is disabled or missing', 'formcreator');
          $template = '@formcreator/field/undefinedfield.html.twig';
          TemplateRenderer::getInstance()->display($template, [
             'item' => $this->question,
             'params' => $options,
-            'no_header' => true,
          ]);
          return;
       }
@@ -179,7 +178,7 @@ class FieldsField extends PluginFormcreatorAbstractField
 
    public function getRenderedHtml($domain, $canEdit = true): string {
       // Plugin field not available
-      if (!Plugin::isPluginActive('fields')) {
+      if (!(new Plugin())->isActivated('fields')) {
          return '';
       }
 
@@ -563,7 +562,7 @@ class FieldsField extends PluginFormcreatorAbstractField
    }
 
    public static function getName(): string {
-      return __("Additionnal fields", "fields");
+      return __("Additional fields", "fields");
    }
 
    public static function canRequire(): bool {
@@ -638,10 +637,6 @@ class FieldsField extends PluginFormcreatorAbstractField
       return true;
    }
 
-   public function isRenderedInTarget(): bool {
-      return false;
-   }
-
    public function getHtmlIcon() {
       return '<i class="fa-fw fas fa-tasks" aria-hidden="true"></i>';
    }
@@ -653,4 +648,9 @@ class FieldsField extends PluginFormcreatorAbstractField
    public function isEditableField(): bool {
       return true;
    }
+
+   public function isAnonymousFormCompatible(): bool {
+      return true;
+   }
+
 }

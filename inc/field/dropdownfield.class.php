@@ -35,14 +35,13 @@ namespace GlpiPlugin\Formcreator\Field;
 use PluginFormcreatorAbstractField;
 use PluginFormcreatorForm;
 use PluginFormcreatorFormAnswer;
-use PluginFormcreatorQuestionFilter;
 use Html;
 use Toolbox;
 use Session;
 use DBUtils;
 use Document;
 use Dropdown;
-use CommonGLPI;
+use CommonDBTM;
 use CommonITILActor;
 use CommonITILObject;
 use CommonTreeDropdown;
@@ -63,7 +62,7 @@ use QueryExpression;
 use QuerySubQuery;
 use GlpiPlugin\Formcreator\Exception\ComparisonException;
 use Glpi\Application\View\TemplateRenderer;
-use State;
+use Plugin;
 
 class DropdownField extends PluginFormcreatorAbstractField
 {
@@ -79,40 +78,6 @@ class DropdownField extends PluginFormcreatorAbstractField
          self::ENTITY_RESTRICT_FORM =>  PluginFormcreatorForm::getTypeName(1),
          self::ENTITY_RESTRICT_BOTH =>  __('User and form', 'formcreator'),
       ];
-   }
-
-   public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0): array {
-      $tabs = parent::getTabNameForItem($item, $withtemplate);
-      $tabs[1] = __('Search filter', 'formcreator');
-      return $tabs;
-   }
-
-   public function displayTabContentForItem(CommonGLPI $item, string $tabnum): bool {
-      switch ($tabnum) {
-         case 1:
-            $this->showFilter();
-            return true;
-      }
-
-      return parent::displayTabContentForItem($item, $tabnum);
-   }
-
-   protected function showFilter() {
-      $template = '@formcreator/field/' . $this->question->fields['fieldtype'] . 'field.filter.html.twig';
-      $parameters = $this->getParameters();
-      $options = [];
-      $options['candel'] = false;
-      $options['target'] = "javascript:;";
-      $options['formoptions'] = sprintf('onsubmit="plugin_formcreator.submitQuestion(this)" data-itemtype="%s" data-id="%s"', $this->question::getType(), $this->question->getID());
-
-      TemplateRenderer::getInstance()->display($template, [
-         'item' => $this->question,
-         'params' => $options,
-         'question_params' => $parameters,
-         'no_header' => true,
-      ]);
-
-      return true;
    }
 
    public function isPrerequisites(): bool {
@@ -149,7 +114,6 @@ class DropdownField extends PluginFormcreatorAbstractField
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
          'params' => $options,
-         'no_header' => true,
       ]);
    }
 
@@ -281,7 +245,7 @@ class DropdownField extends PluginFormcreatorAbstractField
                   ],
                ]);
                $tickets_filter[] = [
-                  'id' => $requestersObserversQuery,
+                  Ticket::getTableField('id') => $requestersObserversQuery,
                ];
             }
 
@@ -370,17 +334,7 @@ class DropdownField extends PluginFormcreatorAbstractField
          $dparams_cond_crit[$itemtype::getTableField('level')] = ['<=', $decodedValues['show_tree_depth'] + $baseLevel];
       }
 
-      // search filter
-      $search_filter = $this->buildSearchFilter();
-      if (count($search_filter['LEFT JOIN']) > 0) {
-         $dparams['condition']['LEFT JOIN'] = $search_filter['LEFT JOIN'];
-      }
-      if (count($dparams_cond_crit) > 0) {
-         $dparams['condition']['WHERE'][] = $dparams_cond_crit;
-      }
-      if ($search_filter['WHERE'] != "") {
-         $dparams['condition']['WHERE'][] = new QueryExpression($search_filter['WHERE']);
-      }
+      $dparams['condition'] = $dparams_cond_crit;
 
       $dparams['display_emptychoice'] = false;
       if ($itemtype != Entity::class) {
@@ -396,117 +350,27 @@ class DropdownField extends PluginFormcreatorAbstractField
       return $dparams;
    }
 
-   /**
-    * get all JOINS required for a search by the itemtype and the search criterias
-    *
-    * @return string
-    */
-   private function buildSearchFilter(): array {
-      $parameters = $this->getParameters();
-      $filter = $parameters['filter']->fields['filter'];
-
-      // @see Search::getDatas
-      $itemtype = $this->question->fields['itemtype'];
-      $data = Search::prepareDatasForSearch($itemtype, $filter);
-
-      $blacklist_tables = [];
-      $orig_table = Search::getOrigTableName($itemtype);
-      if (isset($CFG_GLPI['union_search_type'][$itemtype])) {
-          $itemtable          = $CFG_GLPI['union_search_type'][$itemtype];
-          $blacklist_tables[] = $orig_table;
-      } else {
-          $itemtable = $orig_table;
-      }
-
-      $already_link_tables = [];
-      // Put reference table
-      array_push($already_link_tables, $itemtable);
-
-      $default_join = Search::addDefaultJoin($itemtype, $itemtable, $already_link_tables);
-
-      $searchopt        = Search::getOptions($itemtype);
-
-      $criteria_joins = '';
-      foreach ($filter as $criteria) {
-         $field_id = $criteria['field'];
-         if (!is_numeric($field_id)) {
-            // Field ID invalid, we must ignore it or we will raise an exceptin for sure
-            continue;
-         }
-         // Find joins for each criteria
-         $criteria_joins .= Search::addLeftJoin(
-            $itemtype,
-            $itemtable,
-            $already_link_tables,
-            $searchopt[$field_id]['table'],
-            $searchopt[$field_id]['linkfield'],
-            0,
-            0,
-            $searchopt[$field_id]['joinparams']
-         );
-      }
-
-      $all_joins = $default_join . $criteria_joins;
-
-      foreach ($data['tocompute'] as $val) {
-         if (!in_array($searchopt[$val]["table"], $blacklist_tables)) {
-             $all_joins .= Search::addLeftJoin(
-                 $data['itemtype'],
-                 $itemtable,
-                 $already_link_tables,
-                 $searchopt[$val]["table"],
-                 $searchopt[$val]["linkfield"],
-                 0,
-                 0,
-                 $searchopt[$val]["joinparams"],
-                 $searchopt[$val]["field"]
-             );
-         }
-      }
-
-      $select = '';
-      Search::constructAdditionalSqlForMetacriteria($filter, $select, $all_joins, $already_link_tables, $data);
-
-      // we have all JOINS in a string.
-      // Trying now to convert them into a Query Builder compatible array
-
-      $joins = explode('LEFT JOIN', trim($all_joins));
-      $join_array = [];
-      foreach ($joins as $join) {
-         $join = trim($join);
-         if ($join == '') {
-            continue;
-         }
-         list($table, $join_condition) = explode('ON', $join, 2);
-         // $table may contain an alias expression
-         // $join_condition is the join condition in round brackets (included)
-         $table = str_replace('`', '', trim($table)); // also remove backquotes
-         $join_condition = trim($join_condition);
-         $join_array[$table] = [
-            new QueryExpression(($join_condition)),
-         ];
-      }
-
-      $where = Search::addDefaultWhere($itemtype);
-      $where .= Search::constructCriteriaSQL($filter, $data, $searchopt);
-
-      return [
-         'LEFT JOIN' => $join_array,
-         'WHERE'     => $where,
-      ];
-   }
-
    public function getRenderedHtml($domain, $canEdit = true): string {
       $itemtype = $this->getSubItemtype();
-      $item = new $itemtype();
       if (!$canEdit) {
+         $item = new $itemtype();
          $value = '';
          if ($item->getFromDB($this->value)) {
-            $column = 'name';
+            $value = $item->fields['name'];
             if ($item instanceof CommonTreeDropdown) {
-               $column = 'completename';
+               $value = $item->fields['completename'];
+            } else {
+               /** @var CommonDBTM $item */
+               switch ($item->getType()) {
+                  case User::class:
+                     $value = (new DbUtils())->getUserName($item->getID());
+                     break;
+                  case Document::class:
+                     /** @var Document $item */
+                     $value = $item->getDownloadLink($this->form_answer);
+                     break;
+               }
             }
-            $value = $item->fields[$column];
          }
 
          return $value;
@@ -519,10 +383,15 @@ class DropdownField extends PluginFormcreatorAbstractField
       $dparams = [];
       $dparams = $this->buildParams($rand);
       $dparams['display'] = false;
-      $dparams['_idor_token'] = Session::getNewIDORToken($itemtype);
-      if (version_compare(GLPI_VERSION, '10.1') >= 0 && $item->isField('states_id')) {
-         $dparams['condition'] = State::getDisplayConditionForAssistance();
+
+      $idor_params = [];
+      foreach (['condition', 'displaywith', 'entity_restrict', 'right'] as $sensitive_param) {
+         if (array_key_exists($sensitive_param, $dparams)) {
+            $idor_params[$sensitive_param] = $dparams[$sensitive_param];
+         }
       }
+      $dparams['_idor_token'] = Session::getNewIDORToken($itemtype, $idor_params);
+
       $html .= $itemtype::dropdown($dparams);
       $html .= PHP_EOL;
       $html .= Html::scriptBlock("$(function() {
@@ -558,7 +427,7 @@ class DropdownField extends PluginFormcreatorAbstractField
       $DbUtil = new DbUtils();
       $itemtype = $this->getSubItemtype();
       if ($itemtype == User::class) {
-         $value = $DbUtil->getUserName($this->value);
+         $value = $DbUtil->getUserName($this->value, 0, true);
       } else {
          $value = Dropdown::getDropdownName($DbUtil->getTableForItemType($itemtype), $this->value);
       }
@@ -569,7 +438,12 @@ class DropdownField extends PluginFormcreatorAbstractField
    }
 
    public function getDocumentsForTarget(): array {
-      return [];
+      $itemtype = $this->getSubItemtype();
+      if ($itemtype !== Document::class) {
+         return [];
+      }
+
+      return [$this->value]; // Array of a single document ID
    }
 
    public static function getName(): string {
@@ -688,18 +562,6 @@ class DropdownField extends PluginFormcreatorAbstractField
       return true;
    }
 
-   public function getEmptyParameters(): array {
-      $filter = new PluginFormcreatorQuestionFilter();
-      $filter->setField($this, [
-         'fieldName' => 'filter',
-         'label'     => __('Filter', 'formcreator'),
-         'fieldType' => ['text'],
-      ]);
-      return [
-         'filter' => $filter,
-      ];
-   }
-
    /**
     * get groups of the current user
     *
@@ -740,15 +602,16 @@ class DropdownField extends PluginFormcreatorAbstractField
       if ($result->count() === 0) {
          return [];
       }
+      $a_groups = [];
       foreach ($result as $data) {
-         $a_groups                     = $dbUtil->getAncestorsOf("glpi_groups", $data["groups_id"]);
+         $a_groups                     = $a_groups + $dbUtil->getAncestorsOf("glpi_groups", $data["groups_id"]);
          $a_groups[$data["groups_id"]] = $data["groups_id"];
       }
       return $a_groups;
    }
 
    public function equals($value): bool {
-      $value = html_entity_decode($value);
+      $value = html_entity_decode($value ?? '');
       $itemtype = $this->question->fields['itemtype'];
       $dropdown = new $itemtype();
       if ($dropdown->isNewId($this->value)) {
@@ -770,7 +633,7 @@ class DropdownField extends PluginFormcreatorAbstractField
    }
 
    public function greaterThan($value): bool {
-      $value = html_entity_decode($value);
+      $value = html_entity_decode($value ?? '');
       $itemtype = $this->question->fields['itemtype'];
       $dropdown = new $itemtype();
       if (!$dropdown->getFromDB($this->value)) {
@@ -789,7 +652,7 @@ class DropdownField extends PluginFormcreatorAbstractField
    }
 
    public function regex($value): bool {
-      $value = html_entity_decode($value);
+      $value = html_entity_decode($value ?? '');
       $itemtype = $this->question->fields['itemtype'];
       $dropdown = new $itemtype();
       if (!$dropdown->getFromDB($this->value)) {
@@ -875,7 +738,12 @@ class DropdownField extends PluginFormcreatorAbstractField
       // We need english locale to search searchOptions by name
       $oldLocale = $TRANSLATE->getLocale();
       $TRANSLATE->setLocale("en_GB");
+      $_SESSION['glpilanguage'] = "en_GB";
+      if ($plug = isPluginItemType($itemtype)) {
+         Plugin::loadLang(strtolower($plug['plugin']), "en_GB");
+      }
 
+      /** @var CommonDBTM $item  */
       $item = new $itemtype;
       $item->getFromDB($answer);
 
@@ -893,6 +761,7 @@ class DropdownField extends PluginFormcreatorAbstractField
          if (count($searchOption) == 0) {
             trigger_error("No search option found for $property", E_USER_WARNING);
             $TRANSLATE->setLocale($oldLocale);
+            $_SESSION['glpilanguage'] = $oldLocale;
             return $content;
          }
 
@@ -936,6 +805,11 @@ class DropdownField extends PluginFormcreatorAbstractField
       }
       // Put the old locales on succes or if an expection was thrown
       $TRANSLATE->setLocale($oldLocale);
+      $_SESSION['glpilanguage'] = $oldLocale;
+      if ($plug = isPluginItemType($itemtype)) {
+         Plugin::loadLang(strtolower($plug['plugin']), $oldLocale);
+      }
+
       return $content;
    }
 
@@ -1025,53 +899,5 @@ class DropdownField extends PluginFormcreatorAbstractField
          $this->getSubItemtype(),
          $this->value,
       ];
-   }
-
-   public function getTags(string $search = ''): array {
-      global $TRANSLATE;
-
-      $itemtype = $this->question->fields['itemtype'];
-
-      // Safe check
-      if (empty($itemtype) || !class_exists($itemtype)) {
-         return [];
-      }
-
-      /** @var CommonDBTM $item */
-      $item = new $itemtype;
-
-      $oldLocale = $TRANSLATE->getLocale();
-      $TRANSLATE->setLocale("en_GB");
-      $search_options = $item->rawSearchOptions();
-      $TRANSLATE->setLocale($oldLocale);
-
-      $tags = [];
-      foreach ($search_options as $search_option) {
-         if (!isset($search_option['field'])) {
-            continue;
-         }
-
-         $name = str_replace(' ', '_', $search_option['name']);
-
-         // Must match alowed tag format, see self::parseObjectProperties
-         if (!preg_match('/^[a-zA-Z0-9_.]+$/', $name)) {
-            continue;
-         }
-
-         $id   = $search_option['id'];
-         $question_id = $this->question->getID();
-
-         $text = 'question_' . $question_id . '.' . $name;
-         if ($search == '' || strpos(strtolower($text), strtolower($search)) !== false || strpos(strtolower($this->getQuestion()->fields['name']), strtolower($search)) !== false) {
-            $tags[] = [
-               'id'     => 'answer_' . $question_id . '.' . $id,
-               'name'   => 'answer_' . $question_id . '.' . $name,
-               'text'   => 'answer_' . $question_id . '.' . $name,
-               'q_name' => $this->getQuestion()->fields['name'], // Do not use form translation here
-            ];
-         }
-      }
-
-      return $tags;
    }
 }

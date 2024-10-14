@@ -38,7 +38,6 @@ use Dropdown;
 use Entity;
 use CommonTreeDropdown;
 use CommonDBTM;
-use CommonGLPI;
 use Ticket;
 use User;
 
@@ -72,24 +71,12 @@ class GlpiselectField extends DropdownField
       }
       $this->question->fields['default_values'] = Html::entities_deep($this->question->fields['default_values']);
       $this->deserializeValue($this->question->fields['default_values']);
+      $this->question->fields['_default_values'] = $this->value;
 
-      $parameters = $this->getParameters();
       TemplateRenderer::getInstance()->display($template, [
          'item' => $this->question,
-         'question_params' => $parameters,
          'params' => $options,
-         'no_header' => true,
       ]);
-   }
-
-   public function displayTabContentForItem(CommonGLPI $item, string $tabnum): bool {
-      switch ($tabnum) {
-         case 1:
-            $this->showFilter();
-            return true;
-      }
-
-      return parent::displayTabContentForItem($item, $tabnum);
    }
 
    public static function getName(): string {
@@ -106,7 +93,9 @@ class GlpiselectField extends DropdownField
    }
 
    public function prepareQuestionInputForSave($input) {
-      if (isset($input['itemtype']) && empty($input['itemtype'])) {
+      global $DB;
+
+      if (!isset($input['itemtype']) || empty($input['itemtype'])) {
          Session::addMessageAfterRedirect(
             __('The field value is required:', 'formcreator') . ' ' . $input['name'],
             false,
@@ -115,7 +104,8 @@ class GlpiselectField extends DropdownField
          return [];
       }
 
-      $itemtype = $input['itemtype'] ?? $this->getSubItemtype();
+      $itemtype = $input['itemtype'];
+      $input['itemtype'] = $itemtype;
       $input['values'] = [];
       // Params for entity restrictables itemtypes
       $input['values']['entity_restrict'] = $input['entity_restrict'] ?? self::ENTITY_RESTRICT_FORM;
@@ -134,7 +124,7 @@ class GlpiselectField extends DropdownField
       unset($input['show_tree_depth']);
       unset($input['selectable_tree_root']);
 
-      $input['values'] = json_encode($input['values']);
+      $input['values'] = $DB->escape(json_encode($input['values'], JSON_UNESCAPED_UNICODE));
 
       return $input;
    }
@@ -143,7 +133,7 @@ class GlpiselectField extends DropdownField
       return true;
    }
 
-   public function getAvailableValues(): array {
+   public function getAvailableValues(array $values = null): array {
       return [];
    }
 
@@ -170,7 +160,7 @@ class GlpiselectField extends DropdownField
    }
 
    public function equals($value): bool {
-      $value = html_entity_decode($value);
+      $value = html_entity_decode($value ?? '');
       $itemtype = $this->getSubItemtype();
       $item = new $itemtype();
       if ($item->isNewId($this->value)) {
@@ -187,7 +177,7 @@ class GlpiselectField extends DropdownField
    }
 
    public function greaterThan($value): bool {
-      $value = html_entity_decode($value);
+      $value = html_entity_decode($value ?? '');
       $itemtype = $this->getSubItemtype();
       $item = new $itemtype();
       if (!$item->getFromDB($this->value)) {
