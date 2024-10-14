@@ -43,6 +43,6 @@ if (!isset($_REQUEST['itemtype']) || !isset($_REQUEST['items_id']) || !isset($_R
 }
 
 Session::checkRight('entity', UPDATE);
-if (!(new PluginFormcreatorForm())->duplicateTarget($_REQUEST)) {
+if (!PluginFormcreatorCommon::getForm()->duplicateTarget($_REQUEST)) {
     http_response_code(500);
 }

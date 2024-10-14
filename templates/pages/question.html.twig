@@ -66,7 +66,6 @@
       {
          label_class: 'col-xxl-4',
          input_class: 'col-xxl-8',
-         disabled: not item.isNewItem()
       }
    ) }}
 
@@ -106,6 +105,17 @@
          input_class: 'col-xxl-8',
       }) }}
    {% endblock %}
+   
+   {{ fields.autoNameField(
+      'annotation',
+      item,
+      __('Annotation'),
+   withtemplate,
+   {
+      value: item.fields['annotation'],
+      label_class: 'col-xxl-4',
+      input_class: 'col-xxl-8',
+   } ) }}
 
    {% if not (item.fields['fieldtype'] is null) %}
       {{ fields.textareaField(
@@ -124,5 +134,14 @@
          {% block questionParameters %}
          {% endblock %}
       {% endif %}
+
+      {{ fields.smallTitle(__('Condition to show the question', 'formcreator')) }}
+
+      {{ fields.dropdownArrayField('show_rule', item.fields['show_rule'], item.getEnumShowrule(), '', { 'no_label': true, 'on_change': 'plugin_formcreator_toggleCondition(this);' }) }}
+      {% set parent = item %}
+      {% set conditions = call('PluginFormcreatorCondition::getConditionsFromItem', [item]) %}
+      {% for condition in conditions %}
+         {{ include('@formcreator/components/form/condition.html.twig') }}
+      {% endfor %}
    {% endif %}
 {% endblock %}

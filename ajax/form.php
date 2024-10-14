@@ -30,12 +30,12 @@
  */
 
 include ('../../../inc/includes.php');
-if (!Session::haveRight(PluginFormcreatorForm::$rightname, UPDATE)) {
+if (!Session::haveRight('entity', UPDATE)) {
    http_response_code(403);
    die();
 }
 
-$form = new PluginFormcreatorForm;
+$form = PluginFormcreatorCommon::getForm();
 
 if (!isset($_REQUEST['id']) || !isset($_REQUEST['action'])) {
    http_response_code(400);

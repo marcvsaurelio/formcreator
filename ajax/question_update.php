@@ -32,7 +32,7 @@
 use Glpi\Toolbox\Sanitizer;
 
 include ('../../../inc/includes.php');
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 if (!isset($_REQUEST['id'])) {
    Session::addMessageAfterRedirect(__('Bad request', 'formcreator'), false, ERROR);
@@ -59,4 +59,4 @@ if (!$success) {
    http_response_code(500);
    exit();
 }
-echo json_encode(['name' => $question->getDesignLabel()], JSON_UNESCAPED_UNICODE);
+echo $question->fields['name'] . (!isset($question->fields['annotation']) && empty($question->fields['annotation']) ? '' : ' (' . $question->fields['annotation'] . ')');

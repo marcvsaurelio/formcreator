@@ -31,7 +31,7 @@
 
 include ('../../../inc/includes.php');
 
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 if (!isset($_REQUEST['dropdown_itemtype'])
     || $_REQUEST['dropdown_itemtype'] == '0'

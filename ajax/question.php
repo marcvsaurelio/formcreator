@@ -30,18 +30,15 @@
  */
 
 include ('../../../inc/includes.php');
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 $question_id = $_REQUEST['id'] ?? 0;
 $question = new PluginFormcreatorQuestion();
 if ($question_id == 0) {
-   $sectionFk = PluginFormcreatorQuestion::$items_id;
-   // $question->showForm($question_id);
-   $question->display([
-      'show_nav_header' => false,
-      $sectionFk => (int) $_REQUEST[$sectionFk],
-   ]);
+   $question->getEmpty();
+   $sectionFk = PluginFormcreatorSection::getForeignKeyField();
+   $question->fields[$sectionFk] = (int) $_REQUEST['plugin_formcreator_sections_id'];
 } else {
    $question->getFromDB($question_id);
-   $question->display(['show_nav_header' => false]);
 }
+$question->showForm($question_id);

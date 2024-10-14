@@ -30,13 +30,13 @@
  */
 
 include ('../../../inc/includes.php');
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 if (!isset($_REQUEST['id'])) {
    http_response_code(400);
    exit();
 }
-if (empty($_REQUEST['id']) && !isset($_REQUEST['fieldtype'])) {
+if (!isset($_REQUEST['fieldtype'])) {
    http_response_code(400);
    exit();
 }
@@ -63,10 +63,11 @@ foreach ($_REQUEST as $request_key => $request_value) {
 
 $question->fields['values'] = json_encode($values);
 $field = PluginFormcreatorFields::getFieldInstance(
-   $_REQUEST['fieldtype'] ?? $question->fields['fieldtype'],
+   $_REQUEST['fieldtype'],
    $question
 );
-if (empty($_REQUEST['id']) && !isset($_REQUEST['fieldtype'])) {
+$question->fields['fieldtype'] = '';
+if ($field !== null) {
    $question->fields['fieldtype'] = $_REQUEST['fieldtype'];
 }
 $question->showForm($question->getID());

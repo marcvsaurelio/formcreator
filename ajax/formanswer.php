@@ -42,7 +42,7 @@ if (!isset($_POST['add']) || !isset($_POST['plugin_formcreator_forms_id'])) {
    die();
 }
 
-$form = new PluginFormcreatorForm();
+$form = PluginFormcreatorCommon::getForm();
 if (!$form->getFromDB($_POST['plugin_formcreator_forms_id'])) {
    http_response_code(500);
    die();
@@ -56,7 +56,7 @@ if (!isset($_SESSION['glpiname'])) {
 // Save form
 $backup_debug = $_SESSION['glpi_use_mode'];
 $_SESSION['glpi_use_mode'] = Session::NORMAL_MODE;
-$formAnswer = new PluginFormcreatorFormAnswer();
+$formAnswer = PluginFormcreatorCommon::getFormAnswer();
 if ($formAnswer->add($_POST) === false) {
    http_response_code(400);
    if ($_SESSION['glpiname'] == 'formcreator_temp_user') {
@@ -74,23 +74,6 @@ if ($formAnswer->add($_POST) === false) {
 $form->increaseUsageCount();
 $_SESSION['glpi_use_mode'] = $backup_debug;
 
-if (!PluginFormcreatorForm::isNewID($form->fields['plugin_formcreator_forms_id'])) {
-   $nextForm = new PluginFormcreatorForm();
-   $nextForm->getFromDBByCrit([
-      'id'         => $form->fields['plugin_formcreator_forms_id'],
-      'is_active'  => 1,
-      'is_deleted' => 0,
-   ]);
-   if (!$nextForm->isNewItem()) {
-      echo json_encode(
-         [
-            'redirect' => 'formdisplay.php?id=' . $nextForm->getID(),
-         ], JSON_FORCE_OBJECT
-      );
-      die();
-   }
-}
-
 if ($_SESSION['glpiname'] == 'formcreator_temp_user') {
    // Form was saved by an annymous user
    unset($_SESSION['glpiname']);
@@ -105,28 +88,29 @@ if ($_SESSION['glpiname'] == 'formcreator_temp_user') {
 }
 
 // redirect to created item
-if ($_SESSION['glpibackcreated'] && Ticket::canView()) {
-   if (strpos($_SERVER['HTTP_REFERER'], 'form.form.php') === false) {
-      // User was not testing the form from preview
-      if (count($formAnswer->targetList) == 1) {
-         $target = current($formAnswer->targetList);
-         echo json_encode(
-            [
-               'redirect' => $target->getFormURLWithID($target->getID()),
-            ], JSON_FORCE_OBJECT
-         );
-         die();
-      }
+if ($_SESSION['glpibackcreated']) {
+   if (strpos($_SERVER['HTTP_REFERER'], 'form.form.php') !== false) {
       echo json_encode(
          [
-            'redirect' => $formAnswer->getFormURLWithID($formAnswer->getID()),
+            'redirect' => (new PluginFormcreatorForm())->getFormURLWithID($formAnswer->fields['plugin_formcreator_forms_id']),
+         ], JSON_FORCE_OBJECT
+      );
+      die();
+   }
+   // User was not testing the form from preview
+   reset($formAnswer->targetList);
+   $target = current($formAnswer->targetList);
+   if (count($formAnswer->targetList) == 1 && $target::canView()) {
+      echo json_encode(
+         [
+            'redirect' => $target->getFormURLWithID($target->getID()),
          ], JSON_FORCE_OBJECT
       );
       die();
    }
    echo json_encode(
       [
-         'redirect' => (new PluginFormcreatorForm())->getFormURLWithID($formAnswer->fields['plugin_formcreator_forms_id']),
+         'redirect' => $formAnswer->getFormURLWithID($formAnswer->getID()),
       ], JSON_FORCE_OBJECT
    );
    die();

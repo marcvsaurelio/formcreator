@@ -30,7 +30,6 @@
 
 {% extends "generic_show_form.html.twig" %}
 {% import 'components/form/fields_macros.html.twig' as fields %}
-{% import '@formcreator/components/form/fields_macros.html.twig' as formcreatorFields %}
 
 {% block form_fields %}
     {{ fields.autoNameField(
@@ -50,13 +49,5 @@
     { required: true, full_width: true }
     ) }}
 
-    {{ formcreatorFields.targetTextareaField(
-        'content',
-        item.fields['content'],
-        __('Description', 'formcreator'), {
-            enable_richtext: true,
-            full_width: true,
-            plugin_formcreator_forms_id: item.fields['plugin_formcreator_forms_id']
-        })
-    }}
+    {{ fields.textareaField('content', item.fields['content'], __('Description', 'formcreator'), { enable_richtext: true, full_width: true }) }}
 {% endblock %}

@@ -30,7 +30,7 @@
  */
 
 include ('../../../inc/includes.php');
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 if (!isset($_REQUEST['move']) || !is_array($_REQUEST['move'])) {
    http_response_code(400);

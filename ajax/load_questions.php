@@ -30,15 +30,16 @@
  */
 
 include ('../../../inc/includes.php');
-Session::checkRight(PluginFormcreatorForm::$rightname, UPDATE);
+Session::checkRight('entity', UPDATE);
 
 if (!isset($_REQUEST['section_id'])) {
     http_response_code(400);
     exit();
 }
-$sectionId = (int) $_REQUEST['section_id'];
+ $sectionId = (int) $_REQUEST['section_id'];
 
-$json = [];
-foreach (PluginFormcreatorQuestion::getQuestionsFromSection($sectionId) as $question) {
+ $questions = (new PluginFormcreatorQuestion)->getQuestionsFromSection($sectionId);
+ $json = [];
+foreach ($questions as $question) {
     $json[] = $question->getDesignHtml();
 }

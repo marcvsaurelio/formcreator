@@ -47,8 +47,8 @@
         'name',
         item,
         __('Name'),
-        withtemplate,
-        { required: true }
+    withtemplate,
+    { required: true }
     ) }}
 
     {{ fields.dropdownYesNo('is_active', item.fields['is_active'], __('Active'), { required: true }) }}
@@ -81,6 +81,12 @@
 
     {{ fields.textField('description', item.fields['description'], __('Description')) }}
 
+    {{ fields.textField('annotation', item.fields['annotation'], __('Annotation')) }}
+
+    {{ fields.dropdownYesNo('is_display', item.fields['is_display'], __('Show', 'glpi') ~ ' ' ~ __('Imagem', 'glpi')) }}
+
+    {{ fields.textField('url_image', item.fields['url_image'], __('Path', 'glpi') ~ ' ' ~ __('Imagem', 'glpi')) }}
+
     {{ fields.textareaField('content', item.fields['content'], _n('Header', 'Headers', 1, 'formcreator'), { 'enable_richtext': true }) }}
 
     {{ fields.dropdownYesNo('is_default', item.fields['is_default'], __('Default form in service catalog', 'formcreator')) }}
@@ -98,14 +104,4 @@
         {% set visible = item.fields['is_visible'] %}
     {% endif %}
     {{ fields.dropdownYesNo('is_visible', visible, __('Visible', 'formcreator'), { 'add_field_html': tooltip }) }}
-
-    {{ fields.dropdownField(
-        'PluginFormcreatorForm',
-        'plugin_formcreator_forms_id',
-        item.fields['plugin_formcreator_forms_id'],
-        __('Next form', 'formcreator'),
-        {'condition': {'is_active': 1, 'is_deleted': 0 },
-         'used': [item.fields['id']]
-        }
-    ) }}
 {% endblock %}

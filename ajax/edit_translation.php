@@ -41,8 +41,6 @@ if (!isset($_POST['plugin_formcreator_form_languages_id'])) {
    die();
 }
 
-Session::checkRight('entity', UPDATE);
-
 // if (!isset($_POST['plugin_formcreator_translations_id'])) {
 //    http_response_code(400);
 //    die();
